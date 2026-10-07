@@ -19,7 +19,7 @@
 - [ ] Review Colosseum rules: existing-project eligibility, tracks, prizes
 - [ ] Decide on Build Station attendance and register
 - [x] Create public GitHub repo + README skeleton
-- [ ] Generate Solana devnet keypairs, fund from devnet SOL faucet
+- [x] Generate Solana devnet keypairs, fund from devnet SOL faucet
 
 ---
 
@@ -33,26 +33,26 @@
 - [ ] Thermal/cooling check under sustained load
 
 ### Wasm demo function
-- [ ] Pick demo task (labyrinth shortest-path, seed-based)
-- [ ] Implement algorithm (Rust or AssemblyScript) → compile to `.wasm`
-- [ ] Ensure full determinism (no float, no Date.now, no Math.random)
-- [ ] Compute SHA-256 hash of the `.wasm` file
+- [x] Pick demo task (labyrinth shortest-path, seed-based)
+- [x] Implement algorithm (Rust or AssemblyScript) → compile to `.wasm`
+- [x] Ensure full determinism (no float, no Date.now, no Math.random)
+- [x] Compute SHA-256 hash of the `.wasm` file
 - [ ] Host file externally (IPFS/Arweave/HTTPS) for nodes to download
-- [ ] Write 5–10 known test vectors (input → expected output hash)
+- [x] Write 5–10 known test vectors (input → expected output hash)
 
 ---
 
 ## Phase 2 — Anchor program skeleton (Day 1–3)
 
-- [ ] Anchor project init (`anchor init solcloud`)
-- [ ] Account struct design:
-  - [ ] `NodeAccount` (owner, stake_amount, status, reputation)
-  - [ ] `TaskAccount` (requester, wasm_hash, input, reward, status, **committee_size `N`**, committee[])
-  - [ ] `CommitAccount` (node, task, hash_commitment, submitted_at)
-  - [ ] `TaskResult` (task, final_output, output_hash, status: Finalized/Failed/Refunded)
-- [ ] **Config/constants:** min/max committee size (3..11), odd-only validation, `threshold = N/2 + 1`
-- [ ] Plan instruction list (see Phase 3)
-- [ ] Deploy empty skeleton to devnet; keep local validator as fallback
+- [x] Anchor project init (`anchor init solcloud`)
+- [x] Account struct design:
+  - [x] `NodeAccount` (owner, stake_amount, status, reputation)
+  - [x] `TaskAccount` (requester, wasm_hash, input, reward, status, **committee_size `N`**, committee[])
+  - [x] `CommitAccount` (node, task, hash_commitment, submitted_at)
+  - [x] `TaskResult` (task, final_output, output_hash, status: Finalized/Failed/Refunded)
+- [x] **Config/constants:** min/max committee size (3..11), odd-only validation, `threshold = N/2 + 1`
+- [x] Plan instruction list (see Phase 3)
+- [x] Deploy program to devnet (program id `D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ`)
 
 ---
 
@@ -61,15 +61,15 @@
 **Goal: a full working path with no error cases.**
 
 ### Anchor program
-- [ ] `register_node(stake_amount)` — node stakes, added to registry
-- [ ] `request_task(wasm_hash, input, reward, committee_size)` — dApp creates task, reward escrowed
-  - [ ] Validate `committee_size` is odd and within [3, 11]
-  - [ ] Require enough registered/available nodes for the chosen `N`
-- [ ] Committee selection: pick `N` nodes via slot hash + task ID seed
-- [ ] `commit_result(task_id, hash_commitment)` — node submits commit
-- [ ] `reveal_result(task_id, result, nonce)` — node reveals answer
-- [ ] Finalize logic: **M-of-N majority** check (`threshold = N/2 + 1`), create `TaskResult`
-- [ ] Reward distribution across the matching (correct) nodes
+- [x] `register_node(stake_amount)` — node stakes, added to registry
+- [x] `request_task(wasm_hash, input, reward, committee_size)` — dApp creates task, reward escrowed
+  - [x] Validate `committee_size` is odd and within [3, 11]
+  - [x] Require enough registered/available nodes for the chosen `N`
+- [ ] Committee selection: pick `N` nodes via slot hash + task ID seed (demo passes an explicit node list)
+- [x] `commit_result(task_id, hash_commitment)` — node submits commit
+- [x] `reveal_result(task_id, result, nonce)` — node reveals answer
+- [x] Finalize logic: **M-of-N majority** check (`threshold = N/2 + 1`), create `TaskResult`
+- [x] Reward distribution across the matching (correct) nodes
 
 ### Worker node (TypeScript)
 - [ ] Solana RPC/WebSocket listener for new tasks
@@ -84,21 +84,21 @@
 - [ ] Reads `TaskResult` and updates its own state based on the result
 
 ### Integration test
-- [ ] One full cycle on devnet by hand (request → N nodes → commit → reveal → finalize → payout)
+- [x] One full cycle on devnet by hand (request → N nodes → commit → reveal → finalize → payout)
 - [ ] Verify consumer dApp reads the result correctly
-- [ ] Test with multiple committee sizes (e.g. N=3 and N=5)
+- [ ] Test with multiple committee sizes (e.g. N=3 and N=5) (only N=3 has been run)
 
 ---
 
 ## Phase 4 — Slashing, edge cases, security (Day 8–11)
 
-- [ ] Slashing logic: incorrect/non-matching reveal → slash part of stake
-- [ ] Timeout/refund: if commit or reveal missed its window
-- [ ] No majority reached (all answers differ enough) → full refund to requester
-- [ ] Partial slashing parameter (not 100%, e.g. 5–10% per fault)
-- [ ] "Faulty" flag in worker for the demo (intentionally wrong answer)
-- [ ] Resource limits: timeout, memory cap, output-size cap in sandbox
-- [ ] Reentrancy/double-submit protection (one node commits/reveals once)
+- [x] Slashing logic: incorrect/non-matching reveal → slash part of stake (task 3, node 3 lost 0.5 SOL)
+- [x] Timeout/refund: if commit or reveal missed its window (task 1 commit window; reveal-window path is in the program)
+- [x] No majority reached (all answers differ enough) → full refund to requester (task 4)
+- [x] Partial slashing parameter (not 100%, e.g. 5–10% per fault) (live config is 50%, `slash_bps = 5000`)
+- [ ] "Faulty" flag in worker for the demo (intentionally wrong answer) (done by a script, not a worker)
+- [ ] Resource limits: timeout, memory cap, output-size cap in sandbox (output size cap only)
+- [x] Reentrancy/double-submit protection (one node commits/reveals once)
 - [ ] Pre-flight CLI test for node operators (before staking)
 - [ ] Anchor unit tests on core scenarios (happy path, slashing, timeout, refund)
   - [ ] Include tests across committee sizes (N=3, 5, 11) and threshold edge cases
