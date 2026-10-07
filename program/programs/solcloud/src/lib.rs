@@ -373,6 +373,51 @@ pub mod solcloud {
 
         Ok(())
     }
+
+    /// Return the escrowed reward when a window closed before the task could finish.
+    ///
+    /// Committing: allowed after `commit_deadline` if not every node committed.
+    /// Revealing: allowed after `reveal_deadline` if not every node revealed.
+    /// A full set of reveals must use `finalize` instead, even after the deadline.
+    pub fn refund_expired(ctx: Context<RefundExpired>, _task_id: u64) -> Result<()> {
+        let clock = Clock::get()?;
+        let now = clock.unix_timestamp;
+        let status = ctx.accounts.task.status;
+        let commit_deadline = ctx.accounts.task.commit_deadline;
+        let reveal_deadline = ctx.accounts.task.reveal_deadline;
+        let reveal_count = ctx.accounts.task.reveal_count;
+        let committee_size = ctx.accounts.task.committee_size;
+
+        let expired = match status {
+            TaskStatus::Committing => now > commit_deadline,
+            TaskStatus::Revealing => now > reveal_deadline && reveal_count < committee_size,
+            _ => false,
+        };
+        require!(expired, SolCloudError::WindowStillOpen);
+
+        let reward = ctx.accounts.task.reward;
+        {
+            let task = &mut ctx.accounts.task;
+            let result = &mut ctx.accounts.result;
+            result.task = task.key();
+            result.final_output = Vec::new();
+            result.output_hash = [0u8; 32];
+            result.status = ResultStatus::Refunded;
+            result.agreed_count = reveal_count;
+            result.committee_size = committee_size;
+            result.finalized_at = now;
+            result.bump = ctx.bumps.result;
+            task.status = TaskStatus::Refunded;
+            task.reward = 0;
+        }
+
+        move_lamports(
+            &ctx.accounts.task.to_account_info(),
+            &ctx.accounts.requester.to_account_info(),
+            reward,
+        )?;
+        Ok(())
+    }
 }
 
 fn read_node(acc: &AccountInfo) -> Result<NodeAccount> {
@@ -562,6 +607,27 @@ pub struct Finalize<'info> {
     /// CHECK: treasury pubkey is the one stored in Config.
     #[account(mut, address = config.treasury)]
     pub treasury: UncheckedAccount<'info>,
+    /// CHECK: must be the original requester. Checked against `task.requester`.
+    #[account(mut, address = task.requester)]
+    pub requester: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(task_id: u64)]
+pub struct RefundExpired<'info> {
+    #[account(mut, seeds = [TASK_SEED, task_id.to_le_bytes().as_ref()], bump = task.bump)]
+    pub task: Account<'info, TaskAccount>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + TaskResult::INIT_SPACE,
+        seeds = [RESULT_SEED, task.key().as_ref()],
+        bump
+    )]
+    pub result: Account<'info, TaskResult>,
     /// CHECK: must be the original requester. Checked against `task.requester`.
     #[account(mut, address = task.requester)]
     pub requester: UncheckedAccount<'info>,

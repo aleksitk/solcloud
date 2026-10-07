@@ -20,6 +20,8 @@ pub enum SolCloudError {
     CommitWindowClosed,
     #[msg("The reveal window for this task has closed.")]
     RevealWindowClosed,
+    #[msg("The commit or reveal window is still open, or the task can still be finalized.")]
+    WindowStillOpen,
     #[msg("Reveal does not match the previously submitted commitment.")]
     CommitmentMismatch,
     #[msg("This node has already acted for this task.")]
