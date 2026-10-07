@@ -87,6 +87,9 @@ pub struct CommitAccount {
     pub node: Pubkey,
     pub hash_commitment: [u8; 32],
     pub output_hash: [u8; 32],
+    #[max_len(64)]
+    pub output: Vec<u8>,
+    pub nonce: u64,
     pub revealed: bool,
     pub submitted_at: i64,
     pub bump: u8,

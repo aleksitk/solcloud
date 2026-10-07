@@ -30,4 +30,12 @@ pub enum SolCloudError {
     NoConsensus,
     #[msg("Arithmetic overflow.")]
     Overflow,
+    #[msg("Node is not active.")]
+    NodeNotActive,
+    #[msg("Duplicate node in committee.")]
+    DuplicateCommitteeNode,
+    #[msg("Committee account is not a registered node.")]
+    InvalidCommitteeNode,
+    #[msg("Finalize accounts do not match the committee.")]
+    BadFinalizeAccounts,
 }
