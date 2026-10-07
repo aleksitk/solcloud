@@ -11,9 +11,10 @@ pub const MAX_INPUT_LEN: usize = 64;
 pub const MAX_OUTPUT_LEN: usize = 64;
 
 /// How long (seconds) nodes have to submit commits after a task is created.
-pub const COMMIT_WINDOW_SECS: i64 = 60;
-/// How long (seconds) nodes have to reveal after the commit window closes.
-pub const REVEAL_WINDOW_SECS: i64 = 60;
+/// Demo value: long enough to run the steps by hand. Production would be shorter.
+pub const COMMIT_WINDOW_SECS: i64 = 86_400;
+/// How long (seconds) nodes have to reveal after every commit is in.
+pub const REVEAL_WINDOW_SECS: i64 = 86_400;
 
 /// PDA seed prefixes.
 pub const CONFIG_SEED: &[u8] = b"config";
