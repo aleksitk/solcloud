@@ -1,6 +1,6 @@
-// Step 3 of the devnet happy path: create one task for nodes 1, 2, and 3.
+// Create one task for nodes 1, 2, and 3.
 // Run from Ubuntu:
-//   node scripts/request-task.cjs
+//   node scripts/request-task.cjs 3
 
 const crypto = require("crypto");
 const fs = require("fs");
@@ -17,7 +17,7 @@ const {
 
 const PROGRAM_ID = new PublicKey("D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ");
 const RPC = "https://api.devnet.solana.com";
-const TASK_ID = 2n;
+const TASK_ID = BigInt(process.argv[2] || "3");
 const REWARD = 50_000_000n; // 0.05 SOL
 const WASM_SHA256 = "52d0b49e663d826e92598ff7c0939b2c26804026c750d3cfa92a3dd3986686f6";
 
@@ -64,7 +64,17 @@ async function main() {
     PROGRAM_ID
   );
 
-  const existing = await connection.getAccountInfo(task);
+  let existing = null;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      existing = await connection.getAccountInfo(task);
+      break;
+    } catch (err) {
+      if (attempt === 5) throw err;
+      console.log(`rpc failed, retry ${attempt}/5`);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
   if (existing) {
     console.log("task already exists:", task.toBase58());
     return;
