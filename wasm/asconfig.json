@@ -1,0 +1,22 @@
+{
+  "targets": {
+    "release": {
+      "outFile": "build/solcloud_maze.wasm",
+      "textFile": "build/solcloud_maze.wat",
+      "optimizeLevel": 3,
+      "shrinkLevel": 1,
+      "converge": true,
+      "noAssert": true
+    },
+    "debug": {
+      "outFile": "build/solcloud_maze.debug.wasm",
+      "textFile": "build/solcloud_maze.debug.wat",
+      "debug": true
+    }
+  },
+  "options": {
+    "bindings": "raw",
+    "exportRuntime": false,
+    "runtime": "minimal"
+  }
+}

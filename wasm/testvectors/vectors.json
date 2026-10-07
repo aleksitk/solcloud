@@ -1,0 +1,56 @@
+{
+  "function": "labyrinth-shortest-path",
+  "abi": "solve(seed:u64,size:u32); getPathLength():u32; getPathHash():u64",
+  "wasmSha256": "52d0b49e663d826e92598ff7c0939b2c26804026c750d3cfa92a3dd3986686f6",
+  "generatedAt": "2026-10-07T11:46:37.159Z",
+  "vectors": [
+    {
+      "seed": "1",
+      "size": 512,
+      "pathLength": 35628,
+      "pathHash": "0xea340764c91ec770"
+    },
+    {
+      "seed": "2",
+      "size": 512,
+      "pathLength": 62610,
+      "pathHash": "0x35491cdd1dd71cae"
+    },
+    {
+      "seed": "3",
+      "size": 512,
+      "pathLength": 71722,
+      "pathHash": "0x81f55d4e60fea6df"
+    },
+    {
+      "seed": "42",
+      "size": 512,
+      "pathLength": 31438,
+      "pathHash": "0xa8d88185ab4dafb1"
+    },
+    {
+      "seed": "1337",
+      "size": 512,
+      "pathLength": 30816,
+      "pathHash": "0x6266a9b47ccd7e83"
+    },
+    {
+      "seed": "123456789",
+      "size": 256,
+      "pathLength": 14612,
+      "pathHash": "0xeb49f098ce350e07"
+    },
+    {
+      "seed": "987654321",
+      "size": 128,
+      "pathLength": 5014,
+      "pathHash": "0xdc877c4bdc83bd93"
+    },
+    {
+      "seed": "18446744073709551615",
+      "size": 64,
+      "pathLength": 1076,
+      "pathHash": "0xb1b49ad9561f0985"
+    }
+  ]
+}
