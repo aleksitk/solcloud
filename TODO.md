@@ -110,14 +110,14 @@
 
 **⚠️ The site must be highly professional — this is a key judging surface.**
 
-- [ ] Init React + Tailwind + `@solana/web3.js` project (clean design system, dark theme)
-- [ ] Wallet connect (Phantom/Solflare, devnet)
+- [x] Init React + Tailwind dashboard (dark theme, devnet landing). `@solana/web3.js` is not a dependency yet; balance is read from RPC directly
+- [x] Wallet connect (Phantom/Solflare, devnet)
 - [ ] Function registration UI (wasm hash input)
 - [ ] Task launch UI (input parameters, reward, **committee size selector 3/5/7/9/11**)
 - [ ] Live status: Requested → Committed (x/N) → Revealed (x/N) → Finalized/Failed
 - [ ] Node list: stake, status, last activity
-- [ ] Slashing visual animation/indicator
-- [ ] Transaction links (Solana Explorer, devnet)
+- [x] Slashing visual on the hero round (node 3 pulses). A full history indicator is still open
+- [x] Transaction links (Solana Explorer, devnet)
 - [ ] Consumer dApp visualization (e.g. labyrinth map + path)
 - [ ] Responsive, polished UI for presentation
 - [ ] Show committee size + threshold clearly per task (e.g. "6 of 11 agreed")
