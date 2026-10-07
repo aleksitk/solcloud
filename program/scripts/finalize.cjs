@@ -77,13 +77,26 @@ async function main() {
     keys: [
       { pubkey: task, isSigner: false, isWritable: true },
       { pubkey: result, isSigner: false, isWritable: true },
+      {
+        pubkey: PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID)[0],
+        isSigner: false,
+        isWritable: false,
+      },
+      { pubkey: payer.publicKey, isSigner: false, isWritable: true },
       { pubkey: payer.publicKey, isSigner: false, isWritable: true },
       { pubkey: payer.publicKey, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ...pairs.flatMap(({ commitPda, owner }) => [
-        { pubkey: commitPda, isSigner: false, isWritable: false },
-        { pubkey: owner, isSigner: false, isWritable: true },
-      ]),
+      ...pairs.flatMap(({ commitPda, owner }) => {
+        const [nodePda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("node"), owner.toBuffer()],
+          PROGRAM_ID
+        );
+        return [
+          { pubkey: commitPda, isSigner: false, isWritable: false },
+          { pubkey: owner, isSigner: false, isWritable: true },
+          { pubkey: nodePda, isSigner: false, isWritable: true },
+        ];
+      }),
     ],
     data: Buffer.concat([discriminator("finalize"), u64(TASK_ID)]),
   });

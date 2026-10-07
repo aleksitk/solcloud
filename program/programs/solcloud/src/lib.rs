@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::AccountDeserialize;
+use anchor_lang::{AccountDeserialize, AccountSerialize};
 use anchor_lang::solana_program::hash::hash;
 use anchor_lang::system_program::{self, Transfer};
 
@@ -238,8 +238,10 @@ pub mod solcloud {
 
     /// Tally reveals. Majority (`floor(N/2)+1`) wins and is paid. Otherwise refund.
     ///
-    /// Remaining accounts are pairs: `[commit_0, wallet_0, commit_1, wallet_1, ...]`,
-    /// one pair per committee member, wallets matching `commit.node`.
+    /// Remaining accounts are triples:
+    /// `[commit_0, wallet_0, node_0, ...]`.
+    /// `wallet` is the node owner and must match `commit.node`.
+    /// `node` is that owner's node PDA. A minority reveal loses `slash_bps` of its stake.
     pub fn finalize(ctx: Context<Finalize>, _task_id: u64) -> Result<()> {
         let committee_size = ctx.accounts.task.committee_size;
         require!(
@@ -251,7 +253,7 @@ pub mod solcloud {
             SolCloudError::InvalidTaskState
         );
         require!(
-            ctx.remaining_accounts.len() == committee_size as usize * 2,
+            ctx.remaining_accounts.len() == committee_size as usize * 3,
             SolCloudError::BadFinalizeAccounts
         );
 
@@ -262,8 +264,8 @@ pub mod solcloud {
         let mut counts: Vec<([u8; 32], u8)> = Vec::new();
 
         for pair in 0..committee_size as usize {
-            let commit = read_commit(&ctx.remaining_accounts[pair * 2])?;
-            let wallet = ctx.remaining_accounts[pair * 2 + 1].key();
+            let commit = read_commit(&ctx.remaining_accounts[pair * 3])?;
+            let wallet = ctx.remaining_accounts[pair * 3 + 1].key();
             require!(commit.task == task_key, SolCloudError::BadFinalizeAccounts);
             require!(commit.revealed, SolCloudError::InvalidTaskState);
             require!(commit.node == wallet, SolCloudError::BadFinalizeAccounts);
@@ -321,11 +323,11 @@ pub mod solcloud {
             let share = reward / winners;
             let mut paid = 0u64;
             for pair in 0..committee_size as usize {
-                let commit = read_commit(&ctx.remaining_accounts[pair * 2])?;
+                let commit = read_commit(&ctx.remaining_accounts[pair * 3])?;
                 if commit.output_hash == best_hash {
                     move_lamports(
                         &ctx.accounts.task.to_account_info(),
-                        &ctx.remaining_accounts[pair * 2 + 1],
+                        &ctx.remaining_accounts[pair * 3 + 1],
                         share,
                     )?;
                     paid = paid.checked_add(share).ok_or(SolCloudError::Overflow)?;
@@ -345,6 +347,30 @@ pub mod solcloud {
             )?;
         }
 
+        // A majority loser loses slash_bps of its stake. The SOL goes to the treasury.
+        if agreed {
+            let slash_bps = ctx.accounts.config.slash_bps;
+            for pair in 0..committee_size as usize {
+                let commit = read_commit(&ctx.remaining_accounts[pair * 3])?;
+                if commit.output_hash == best_hash {
+                    continue;
+                }
+                let node_info = &ctx.remaining_accounts[pair * 3 + 2];
+                let (pda, _) = Pubkey::find_program_address(
+                    &[NODE_SEED, commit.node.as_ref()],
+                    ctx.program_id,
+                );
+                require!(pda == node_info.key(), SolCloudError::InvalidCommitteeNode);
+                let slashed = reduce_stake(node_info, slash_bps)?;
+                move_lamports(
+                    node_info,
+                    &ctx.accounts.treasury.to_account_info(),
+                    slashed,
+                )?;
+                msg!("slashed {} lamports from {}", slashed, commit.node);
+            }
+        }
+
         Ok(())
     }
 }
@@ -354,6 +380,25 @@ fn read_node(acc: &AccountInfo) -> Result<NodeAccount> {
     let mut slice: &[u8] = &data;
     NodeAccount::try_deserialize(&mut slice)
         .map_err(|_| error!(SolCloudError::InvalidCommitteeNode))
+}
+
+fn reduce_stake(acc: &AccountInfo, slash_bps: u16) -> Result<u64> {
+    let mut node = read_node(acc)?;
+    let slashed = node
+        .stake_amount
+        .checked_mul(slash_bps as u64)
+        .ok_or(SolCloudError::Overflow)?
+        / 10_000;
+    node.stake_amount = node
+        .stake_amount
+        .checked_sub(slashed)
+        .ok_or(SolCloudError::Overflow)?;
+    if node.stake_amount == 0 {
+        node.status = NodeStatus::Slashed;
+    }
+    let mut data = acc.try_borrow_mut_data()?;
+    node.try_serialize(&mut &mut data[..])?;
+    Ok(slashed)
 }
 
 fn read_commit(acc: &AccountInfo) -> Result<CommitAccount> {
@@ -512,6 +557,11 @@ pub struct Finalize<'info> {
         bump
     )]
     pub result: Account<'info, TaskResult>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    /// CHECK: treasury pubkey is the one stored in Config.
+    #[account(mut, address = config.treasury)]
+    pub treasury: UncheckedAccount<'info>,
     /// CHECK: must be the original requester. Checked against `task.requester`.
     #[account(mut, address = task.requester)]
     pub requester: UncheckedAccount<'info>,
