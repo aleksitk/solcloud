@@ -132,7 +132,7 @@ The chain already accepts any Wasm hash. The labyrinth stays the built-in demo: 
 - [x] A node runner loads a Wasm file with that export, checks the SHA-256, and runs it on a worker thread with a timeout. `worker/check.mjs` matches the maze vector (seed 1, size 512, length 35628), rejects a wrong hash, and stops a run that passes the timeout
 - [x] Dashboard editor: AssemblyScript source, compile with `asc`, show the hash, and use that hash on the next task. The labyrinth stays the default. Compile runs on the local dev server
 - [x] For the demo, the compiled file stays on the machine the nodes read, at `worker/modules/<hash>.wasm`. Public hosting is still the Phase 1 item (IPFS/Arweave/HTTPS)
-- [ ] Keep the labyrinth registered. Tasks that are not the maze show the output bytes, not the map
+- [x] Keep the labyrinth registered. The map opens only for the maze hash, including rounds that used the previous hash. Any other task shows the output bytes
 
 ---
 

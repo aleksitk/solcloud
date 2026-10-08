@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { latestRound } from "./requestTask.js";
+import { isLabyrinth, latestRound } from "./requestTask.js";
 
 const DIR_N = 1;
 const DIR_E = 2;
@@ -11,6 +11,15 @@ const WINDOW = 48;
 let cached = null;
 let pending = null;
 
+function hexDump(hex) {
+  const bytes = hex.match(/.{1,2}/g) || [];
+  const lines = [];
+  for (let index = 0; index < bytes.length; index += 16) {
+    lines.push(bytes.slice(index, index + 16).join(" "));
+  }
+  return lines.join("\n");
+}
+
 function loadTrace() {
   if (cached) return Promise.resolve(cached);
   if (pending) return pending;
@@ -18,18 +27,29 @@ function loadTrace() {
     .then(
       (round) =>
         new Promise((resolve) => {
-          if (!round?.mazeSize) {
-            resolve({ trace: null, note: "" });
+          if (!round) {
+            resolve({ kind: "empty", trace: null, round: null, note: "" });
+            return;
+          }
+          if (!isLabyrinth(round.wasmHash)) {
+            resolve({ kind: "bytes", trace: null, round, note: "" });
+            return;
+          }
+          if (!round.mazeSize) {
+            resolve({ kind: "empty", trace: null, round: null, note: "" });
             return;
           }
           if (round.mazeSize > 512) {
-            resolve({ trace: null, note: "This grid is too large to draw here." });
+            resolve({ kind: "maze", trace: null, round: null, note: "This grid is too large to draw here." });
             return;
           }
           const worker = new Worker(new URL("./mazeWorker.js", import.meta.url), { type: "module" });
           worker.onmessage = (event) => {
             worker.terminate();
             resolve({
+              kind: "maze",
+              round: null,
+              note: "",
               trace: {
                 id: round.id,
                 seed: round.seed.toString(),
@@ -39,17 +59,16 @@ function loadTrace() {
                 path: event.data.path,
                 walls: event.data.walls,
               },
-              note: "",
             });
           };
           worker.onerror = () => {
             worker.terminate();
-            resolve({ trace: null, note: "The path could not be traced." });
+            resolve({ kind: "maze", trace: null, round: null, note: "The path could not be traced." });
           };
           worker.postMessage({ seed: round.seed.toString(), size: round.mazeSize });
         }),
     )
-    .catch(() => ({ trace: null, note: "" }))
+    .catch(() => ({ kind: "empty", trace: null, round: null, note: "" }))
     .then((next) => {
       cached = next;
       return next;
@@ -58,7 +77,7 @@ function loadTrace() {
 }
 
 function useMazeTrace() {
-  const [state, setState] = useState(cached || { trace: null, note: "" });
+  const [state, setState] = useState(cached || { kind: "loading", trace: null, round: null, note: "" });
 
   useEffect(() => {
     let live = true;
@@ -147,7 +166,27 @@ function drawWindow(canvas, walls, path, size, originX, originY) {
 }
 
 export function MazeSummary({ onOpen }) {
-  const { trace, note } = useMazeTrace();
+  const { kind, trace, round, note } = useMazeTrace();
+
+  if (kind === "loading" || kind === "empty") return null;
+
+  if (kind === "bytes") {
+    const bytes = round.output ? round.output.length / 2 : null;
+    return (
+      <section className="path-row">
+        <div>
+          <p className="kicker">Output</p>
+          <h2>Round {round.id}</h2>
+          <p>{bytes === null ? "Waiting for the result." : `${bytes} bytes`}</p>
+        </div>
+        {round.output ? (
+          <button type="button" className="path-open" onClick={onOpen}>
+            Show output
+          </button>
+        ) : null}
+      </section>
+    );
+  }
 
   if (!trace && !note) return null;
 
@@ -176,7 +215,7 @@ export function MazeSummary({ onOpen }) {
 }
 
 export function MazeView({ onClose }) {
-  const { trace, note } = useMazeTrace();
+  const { kind, trace, round, note } = useMazeTrace();
   const entranceRef = useRef(null);
   const exitRef = useRef(null);
   const titleRef = useRef(null);
@@ -202,6 +241,29 @@ export function MazeView({ onClose }) {
   }, [trace]);
 
   const exitOrigin = trace ? trace.size - WINDOW : 0;
+
+  if (kind === "bytes") {
+    const count = round.output ? round.output.length / 2 : 0;
+    return (
+      <section className="shell map-view">
+        <button type="button" className="map-back" onClick={onClose}>
+          ← Rounds
+        </button>
+        <h1 ref={titleRef} tabIndex={-1}>
+          Output
+        </h1>
+        <p className="map-round">Round {round.id}</p>
+        {round.output ? (
+          <>
+            <p className="map-round">{count} bytes</p>
+            <pre className="output-bytes">{hexDump(round.output)}</pre>
+          </>
+        ) : (
+          <p className="map-round">Waiting for the result.</p>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section className="shell map-view">

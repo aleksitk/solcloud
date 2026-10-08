@@ -9,6 +9,20 @@ import {
 export const RPC = "https://api.devnet.solana.com";
 export const PROGRAM_ID = new PublicKey("D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ");
 export const WASM_HASH = "ee0b3e4c3ede257e3719c52deee27528ea791218cdea3a5802fd52bf9ce5057a";
+// Rounds already on devnet named the maze before `run` was added.
+const PREVIOUS_LABYRINTH_HASH = "52d0b49e663d826e92598ff7c0939b2c26804026c750d3cfa92a3dd3986686f6";
+
+export function isLabyrinth(hash) {
+  return hash === WASM_HASH || hash === PREVIOUS_LABYRINTH_HASH;
+}
+
+function hexBytes(bytes) {
+  let hex = "";
+  for (let index = 0; index < bytes.length; index += 1) {
+    hex += bytes[index].toString(16).padStart(2, "0");
+  }
+  return hex;
+}
 
 // Public owner keys of the three nodes already staked on devnet.
 const NODE_OWNERS = [
@@ -122,6 +136,7 @@ export function describeRound(round) {
 function parseTask(raw, taskId, task) {
   const data = Uint8Array.from(raw);
   const view = new DataView(data.buffer);
+  const wasmHash = hexBytes(data.subarray(40, 72));
   const inputLen = view.getUint32(72, true);
   const seed = inputLen >= 12 ? view.getBigUint64(76, true) : null;
   const mazeSize = inputLen >= 12 ? view.getUint32(84, true) : null;
@@ -139,6 +154,7 @@ function parseTask(raw, taskId, task) {
     reveals: data[offset + 2],
     seed,
     mazeSize,
+    wasmHash,
     committee,
     threshold: Math.floor(committee / 2) + 1,
   };
@@ -149,12 +165,14 @@ function parseResult(raw) {
   const data = Uint8Array.from(raw);
   const view = new DataView(data.buffer);
   const outputLen = view.getUint32(40, true);
+  if (44 + outputLen > data.length) return null;
   const offset = 44 + outputLen + 32;
   const names = ["Finalized", "Failed", "Refunded"];
   return {
     status: names[data[offset]] || "Unknown",
     agreed: data[offset + 1],
     committee: data[offset + 2],
+    output: hexBytes(data.subarray(44, 44 + outputLen)),
   };
 }
 
@@ -188,9 +206,16 @@ export async function readRound(taskId) {
   const info = await readAccount(task);
   if (!info) return null;
   const parsed = parseTask(info.data, taskId, task);
+  const [result] = PublicKey.findProgramAddressSync(
+    [Buffer.from("result"), task.toBuffer()],
+    PROGRAM_ID
+  );
+  const resultInfo = await readAccount(result);
+  const parsedResult = parseResult(resultInfo?.data);
   const live = parsed.status === "Committing" || parsed.status === "Revealing";
   return {
     ...parsed,
+    output: parsedResult ? parsedResult.output : null,
     tone: parsed.status === "Finalized" ? "good" : parsed.status === "Failed" ? "bad" : live ? "live" : "muted",
   };
 }
