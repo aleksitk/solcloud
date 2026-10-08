@@ -6,6 +6,7 @@ import { MazeSummary, MazeView } from "./MazePath.jsx";
 import NodeList from "./NodeList.jsx";
 import RoundHistory from "./RoundHistory.jsx";
 import RoundStatus from "./RoundStatus.jsx";
+import StakeForm from "./StakeForm.jsx";
 import WalletButton from "./WalletButton.jsx";
 
 const PROGRAM_ID = "D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ";
@@ -49,6 +50,9 @@ export default function App() {
             <button type="button" className={view === "launch" ? "on" : ""} onClick={() => setView("launch")}>
               New task
             </button>
+            <button type="button" className={view === "stake" ? "on" : ""} onClick={() => setView("stake")}>
+              Stake
+            </button>
           </nav>
           <div className="header-tools">
             <a className="program-link" href={explorerAddress(PROGRAM_ID)} target="_blank" rel="noreferrer">
@@ -61,6 +65,8 @@ export default function App() {
 
       {view === "launch" ? (
         <LaunchForm onOpenFunction={() => setView("functions")} />
+      ) : view === "stake" ? (
+        <StakeForm />
       ) : view === "functions" ? (
         <FunctionView onUse={() => setView("launch")} />
       ) : view === "map" ? (

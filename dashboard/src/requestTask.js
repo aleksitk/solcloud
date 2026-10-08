@@ -262,29 +262,80 @@ function solText(lamports) {
 
 const NODE_STATUS = ["Active", "Inactive", "Slashed"];
 
+function shortOwner(owner) {
+  return `${owner.slice(0, 4)}…${owner.slice(-4)}`;
+}
+
+export function nodePda(owner) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("node"), new PublicKey(owner).toBuffer()],
+    PROGRAM_ID
+  )[0];
+}
+
+export async function readMinStake() {
+  const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
+  const info = await readAccount(config);
+  if (!info) throw new Error("The protocol config is missing on devnet.");
+  return Buffer.from(info.data).readBigUInt64LE(72);
+}
+
+export async function findNode(owner) {
+  const node = nodePda(owner);
+  const info = await readAccount(node);
+  if (!info) return null;
+  const data = Buffer.from(info.data);
+  return { address: node.toBase58(), stake: data.readBigUInt64LE(40) };
+}
+
 export async function readNodes() {
-  const nodes = [];
-  for (let index = 0; index < NODE_OWNERS.length; index++) {
-    const owner = new PublicKey(NODE_OWNERS[index]);
-    const [pda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("node"), owner.toBuffer()],
-      PROGRAM_ID
-    );
-    const info = await readAccount(pda);
-    if (!info) continue;
-    const data = Buffer.from(info.data);
+  const accounts = await withRetries(() =>
+    connection.getProgramAccounts(PROGRAM_ID, { filters: [{ dataSize: 66 }] })
+  );
+  const known = new Map(NODE_OWNERS.map((owner, index) => [owner, index]));
+  const nodes = accounts.map(({ pubkey, account }) => {
+    const data = Buffer.from(account.data);
+    const owner = new PublicKey(data.subarray(8, 40)).toBase58();
     const stake = data.readBigUInt64LE(40);
     const status = data[48];
-    nodes.push({
-      id: String(index + 1).padStart(2, "0"),
-      address: pda.toBase58(),
+    const order = known.get(owner);
+    return {
+      id: order === undefined ? shortOwner(owner) : String(order + 1).padStart(2, "0"),
+      owner,
+      order: order === undefined ? 1000 : order,
+      address: pubkey.toBase58(),
       status: NODE_STATUS[status] || "Unknown",
       tone: status === 2 ? "bad" : status === 0 ? "good" : "muted",
       stakeText: solText(stake),
       reduced: stake < 1_000_000_000n,
-    });
-  }
+    };
+  });
+  nodes.sort((a, b) => a.order - b.order || a.owner.localeCompare(b.owner));
   return nodes;
+}
+
+export async function buildRegisterNode({ owner, stakeLamports }) {
+  const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
+  const node = nodePda(owner);
+  const data = concat([await discriminator("register_node"), u64(stakeLamports)]);
+  const ix = new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: config, isSigner: false, isWritable: true },
+      { pubkey: node, isSigner: false, isWritable: true },
+      { pubkey: new PublicKey(owner), isSigner: true, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+  const { blockhash, lastValidBlockHeight } = await withRetries(() =>
+    connection.getLatestBlockhash("confirmed")
+  );
+  const tx = new Transaction({
+    feePayer: new PublicKey(owner),
+    recentBlockhash: blockhash,
+  }).add(ix);
+  return { tx, node, blockhash, lastValidBlockHeight };
 }
 
 export async function latestRound() {

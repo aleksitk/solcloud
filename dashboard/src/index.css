@@ -539,7 +539,7 @@ h1 {
 
 .sheet-head.nodes-head,
 .sheet-row.nodes-row {
-  grid-template-columns: 88px minmax(0, 1.5fr) 150px 88px;
+  grid-template-columns: 120px minmax(0, 1.5fr) 150px 88px;
 }
 
 .row-meta {
@@ -1040,6 +1040,15 @@ h1 {
   margin-top: 36px;
 }
 
+.stake-field {
+  display: grid;
+  gap: 12px;
+  max-width: 280px;
+  margin-top: 28px;
+  color: #c4b6d4;
+  font-size: 13px;
+}
+
 .fields label {
   display: grid;
   gap: 12px;
@@ -1048,7 +1057,8 @@ h1 {
   line-height: 1.4;
 }
 
-.fields input {
+.fields input,
+.stake-field input {
   width: 100%;
   box-sizing: border-box;
   padding: 12px 14px;
