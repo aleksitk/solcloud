@@ -1,36 +1,8 @@
-import { useEffect, useState } from "react";
-import { readNodeHistory } from "./requestTask.js";
-
 function explorerAddress(address) {
   return `https://explorer.solana.com/address/${address}?cluster=devnet`;
 }
 
-export default function NodeHistory({ owner }) {
-  const [rows, setRows] = useState(null);
-  const [note, setNote] = useState("Reading this node's rounds…");
-
-  useEffect(() => {
-    let stop = false;
-    setRows(null);
-    setNote("Reading this node's rounds…");
-
-    async function load() {
-      try {
-        const next = await readNodeHistory(owner);
-        if (stop) return;
-        setRows(next);
-        setNote(next.length ? "" : "This node has no rounds yet.");
-      } catch (err) {
-        if (!stop) setNote(err?.message || "Devnet is not responding.");
-      }
-    }
-
-    load();
-    return () => {
-      stop = true;
-    };
-  }, [owner]);
-
+export default function NodeHistory({ rows, note }) {
   return (
     <div className="mine-history">
       <div className="ledger-head">

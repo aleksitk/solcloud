@@ -303,16 +303,32 @@ function parseCommit(raw) {
   };
 }
 
-function revealTime(createdAt, revealedAt) {
-  if (!createdAt || revealedAt <= 0n) return "—";
+function revealSeconds(createdAt, revealedAt) {
+  if (!createdAt || revealedAt <= 0n) return null;
   const seconds = Number(revealedAt) - createdAt;
-  if (!Number.isFinite(seconds) || seconds < 0) return "—";
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.round(seconds / 60);
+  if (!Number.isFinite(seconds) || seconds < 0) return null;
+  return seconds;
+}
+
+export function formatDuration(seconds) {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "—";
+  const whole = Math.round(seconds);
+  if (whole < 60) return `${whole}s`;
+  const minutes = Math.round(whole / 60);
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.round(minutes / 60);
   if (hours < 48) return `${hours}h`;
   return `${Math.round(hours / 24)}d`;
+}
+
+// Mean time-to-reveal on finalized rounds only. The node never submits this.
+export function averageCompletion(rows) {
+  const samples = rows.filter(
+    (row) => (row.outcome === "Won" || row.outcome === "Slashed") && row.seconds != null
+  );
+  if (!samples.length) return "—";
+  const mean = samples.reduce((sum, row) => sum + row.seconds, 0) / samples.length;
+  return formatDuration(mean);
 }
 
 function nodeOutcome(task, commit, result) {
@@ -371,12 +387,14 @@ export async function readNodeHistory(owner) {
     if (!taskInfos[index]) continue;
     const task = parseTask(taskInfos[index].data, BigInt(present[index].index + 1), taskKeys[index]);
     const result = parseResult(resultInfos[index]?.data);
+    const seconds = revealSeconds(task.createdAt, present[index].commit.revealedAt);
     const verdict = nodeOutcome(task, present[index].commit, result);
     rows.push({
       id: task.id,
       address: task.address,
       committee: task.committee,
-      time: revealTime(task.createdAt, present[index].commit.revealedAt),
+      seconds,
+      time: formatDuration(seconds),
       ...verdict,
     });
   }

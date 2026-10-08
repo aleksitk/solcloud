@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import {
+  averageCompletion,
   buildRegisterNode,
   explorerTx,
   findNode,
   readMinStake,
+  readNodeHistory,
   sendSigned,
   solToLamports,
 } from "./requestTask.js";
@@ -27,6 +29,8 @@ export default function StakeForm() {
   const [stake, setStake] = useState("1");
   const [existing, setExisting] = useState(null);
   const [lookup, setLookup] = useState("idle");
+  const [rounds, setRounds] = useState(null);
+  const [roundsNote, setRoundsNote] = useState("");
   const [review, setReview] = useState(null);
   const [phase, setPhase] = useState("idle");
   const [result, setResult] = useState(null);
@@ -67,6 +71,31 @@ export default function StakeForm() {
       live = false;
     };
   }, [wallet.address, result]);
+
+  useEffect(() => {
+    if (!existing || !wallet.address) {
+      setRounds(null);
+      setRoundsNote("");
+      return undefined;
+    }
+    let live = true;
+    setRounds(null);
+    setRoundsNote("Reading this node's rounds…");
+    readNodeHistory(wallet.address)
+      .then((next) => {
+        if (!live) return;
+        setRounds(next);
+        setRoundsNote(next.length ? "" : "This node has no rounds yet.");
+      })
+      .catch((err) => {
+        if (!live) return;
+        setRounds(null);
+        setRoundsNote(err?.message || "Devnet is not responding.");
+      });
+    return () => {
+      live = false;
+    };
+  }, [existing, wallet.address]);
 
   let lamports = 0n;
   try {
@@ -149,6 +178,10 @@ export default function StakeForm() {
               <dt>Success</dt>
               <dd className={existing.success.endsWith("%") ? undefined : "words"}>{existing.success}</dd>
             </div>
+            <div>
+              <dt>Average</dt>
+              <dd>{rounds ? averageCompletion(rounds) : "—"}</dd>
+            </div>
           </dl>
           <p className="hint">
             <a href={`https://explorer.solana.com/address/${existing.address}?cluster=devnet`} target="_blank" rel="noreferrer">
@@ -179,7 +212,7 @@ export default function StakeForm() {
         </form>
       )}
 
-      {existing ? <NodeHistory owner={wallet.address} /> : null}
+      {existing ? <NodeHistory rows={rounds} note={roundsNote} /> : null}
 
       {review && !existing && (
         <div className="review">
