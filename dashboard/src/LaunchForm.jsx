@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  WASM_HASH,
   buildRequestTask,
   explorerTx,
   nextTaskId,
@@ -8,6 +7,7 @@ import {
   solToLamports,
 } from "./requestTask.js";
 import RoundStatus from "./RoundStatus.jsx";
+import { useFunctionChoice } from "./functionChoice.jsx";
 import { useWallet } from "./wallet.jsx";
 
 const SIZES = [3, 5, 7, 9, 11];
@@ -24,6 +24,7 @@ function shortError(err) {
 
 export default function LaunchForm({ onOpenFunction }) {
   const wallet = useWallet();
+  const { choice } = useFunctionChoice();
   const [size, setSize] = useState(3);
   const [reward, setReward] = useState("0.05");
   const [seed, setSeed] = useState("1");
@@ -74,6 +75,7 @@ export default function LaunchForm({ onOpenFunction }) {
         rewardLamports: solToLamports(reward),
         seed: review.seed,
         mazeSize: review.maze,
+        wasmHash: choice.hash,
       });
       setPhase("signing");
       const signed = await wallet.signTransaction(built.tx);
@@ -97,7 +99,7 @@ export default function LaunchForm({ onOpenFunction }) {
       <p className="kicker">New task</p>
       <h1>Escrow a round.</h1>
       <p className="lede">
-        The maze program is already registered. Pick the committee, the reward, and the input.
+        Pick the committee, the reward, and the input. The hash below is the Wasm this task will name.
         The reward stays locked until the round settles.
       </p>
 
@@ -162,7 +164,7 @@ export default function LaunchForm({ onOpenFunction }) {
         </div>
 
         <button type="button" className="wasm wasm-link" onClick={onOpenFunction}>
-          Labyrinth · {WASM_HASH.slice(0, 12)}…{WASM_HASH.slice(-8)}
+          {choice.name} · {choice.hash.slice(0, 12)}…{choice.hash.slice(-8)}
         </button>
 
         <button className="submit" type="submit" disabled={!valid || phase === "preparing" || phase === "signing" || phase === "sending"}>

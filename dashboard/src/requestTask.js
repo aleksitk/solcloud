@@ -299,14 +299,14 @@ export async function nextTaskId() {
   throw new Error("Could not find a free task id.");
 }
 
-export async function buildRequestTask({ requester, taskId, rewardLamports, seed, mazeSize }) {
+export async function buildRequestTask({ requester, taskId, rewardLamports, seed, mazeSize, wasmHash = WASM_HASH }) {
   const input = mazeInput(seed, mazeSize);
   const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
   const [task] = PublicKey.findProgramAddressSync(
     [Buffer.from("task"), u64(taskId)],
     PROGRAM_ID
   );
-  const wasm = Buffer.from(WASM_HASH, "hex");
+  const wasm = Buffer.from(wasmHash, "hex");
   const data = concat([
     await discriminator("request_task"),
     u64(taskId),

@@ -874,6 +874,31 @@ h1 {
   color: #fff;
 }
 
+.fn-source {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 240px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: #110818;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.fn-error {
+  margin: 16px 0 0;
+  color: #ff8d8d;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .fields {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
