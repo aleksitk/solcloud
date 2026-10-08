@@ -9,6 +9,7 @@ import {
   sendSigned,
   solToLamports,
 } from "./requestTask.js";
+import EnvCheck from "./EnvCheck.jsx";
 import NodeHistory from "./NodeHistory.jsx";
 import { useWallet } from "./wallet.jsx";
 
@@ -147,6 +148,8 @@ export default function StakeForm() {
           ? "Stake, status, and the rounds this node won or lost. The chain writes these when a round settles."
           : `Lock at least ${solLabel(minStake)} SOL from this wallet. That wallet becomes a node on devnet. The stake stays in the node account.`}
       </p>
+
+      <EnvCheck />
 
       {lookup === "reading" ? (
         <p className="hint">Reading this wallet's node…</p>

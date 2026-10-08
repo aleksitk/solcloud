@@ -134,7 +134,7 @@ Two paths on the site that already exists. No new instruction beyond the three m
 - [x] My Node: stake, status (active or slashed), tasks completed, tasks slashed, and the success rate. Shown on the stake page when the connected wallet is already a node. With no settled rounds the success line says “None yet” instead of a percentage
 - [x] Task history for the connected node, from its commit accounts. Each row is a task id, committee size, outcome (won, slashed, timed out, or no majority), and time-to-reveal (`revealed_at` minus the task's `created_at`). Older rounds have no reveal time, so the column stays blank
 - [x] Average completion time: the mean of reveal times on finalized tasks, shown on My Node. Rounds with no reveal time are left out, so the line stays blank until a reveal is recorded. The node does not submit the number. The node browser will sort with this
-- [ ] Environment check: the operator runs `worker/check.mjs` on their own machine before staking. My Node shows pass or fail once. That result is not a filter
+- [x] Environment check: the operator runs `worker/check.mjs` on this machine from the stake page, before staking and on My Node. The page shows Pass or Fail once and remembers it in the browser. The result is not written on chain, and the node list does not use it
 - [ ] My Requests: tasks this wallet created. Task id, status, reward, and a link to the result
 - [ ] Node browser: every active node, with success rate, average completion time, stake, and the committee sizes it can be drawn into. Each column sorts
 - [ ] Speed class (fast, standard, slow) is a third of the active nodes by completion time: top, middle, bottom. No fixed millisecond cutoff

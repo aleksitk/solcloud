@@ -1874,6 +1874,44 @@ h2,
   margin-top: 28px;
 }
 
+.env-check {
+  max-width: 720px;
+  margin-top: 28px;
+  padding: 8px 22px 18px;
+  border: 1px solid rgba(23, 21, 28, 0.1);
+  border-radius: 24px;
+  background: #fff;
+}
+
+.env-check .ledger-head {
+  align-items: center;
+}
+
+.env-check .hint {
+  margin: 4px 0 16px;
+}
+
+.env-check .mono {
+  font-family: var(--font-mono);
+  font-size: inherit;
+  white-space: nowrap;
+}
+
+.env-check .submit {
+  margin-top: 0;
+}
+
+.env-check .checked,
+.env-check .form-error {
+  margin: 12px 0 0;
+}
+
+.env-check .checked {
+  color: #5c6570;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 @media (max-width: 800px) {
   .mine-stats {
     grid-template-columns: 1fr 1fr;
