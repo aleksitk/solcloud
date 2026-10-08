@@ -990,6 +990,16 @@ h1 {
   word-break: break-all;
 }
 
+.fn-editor-foot .fn-saved {
+  display: block;
+  margin-top: 6px;
+  color: #c4b6d4;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .fn-editor-foot .path-open {
   flex: none;
 }

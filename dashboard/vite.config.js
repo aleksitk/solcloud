@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+// compileSource also writes worker/modules/<hash>.wasm for the local node.
 import { compileSource } from "./server/compile.mjs";
 
 function readBody(req) {

@@ -131,7 +131,7 @@ The chain already accepts any Wasm hash. The labyrinth stays the built-in demo: 
 - [x] One ABI: `alloc` plus `run`. Input and output are capped at 64 bytes. The maze's `run` takes the 12-byte seed and size and returns the same 12-byte path result as `solve`. All 8 vectors match. Module hash `ee0b3e4c3ede257e3719c52deee27528ea791218cdea3a5802fd52bf9ce5057a`. Rounds already on devnet keep the previous hash
 - [x] A node runner loads a Wasm file with that export, checks the SHA-256, and runs it on a worker thread with a timeout. `worker/check.mjs` matches the maze vector (seed 1, size 512, length 35628), rejects a wrong hash, and stops a run that passes the timeout
 - [x] Dashboard editor: AssemblyScript source, compile with `asc`, show the hash, and use that hash on the next task. The labyrinth stays the default. Compile runs on the local dev server
-- [ ] For the demo, the compiled file stays on the machine the nodes read. Public hosting is still the Phase 1 item (IPFS/Arweave/HTTPS)
+- [x] For the demo, the compiled file stays on the machine the nodes read, at `worker/modules/<hash>.wasm`. Public hosting is still the Phase 1 item (IPFS/Arweave/HTTPS)
 - [ ] Keep the labyrinth registered. Tasks that are not the maze show the output bytes, not the map
 
 ---

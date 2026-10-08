@@ -1,9 +1,20 @@
 // Load a SolCloud Wasm module, check its SHA-256, and run it off the main thread.
-// Usage: node run.mjs <wasm-file> <sha256-hex> <input-hex>
+// Usage: node run.mjs <sha256-hex> <input-hex>
+//        node run.mjs <wasm-file> <sha256-hex> <input-hex>
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+export function moduleFile(hash) {
+  const name = String(hash).toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(name)) throw new Error("Wasm hash must be 64 hex characters.");
+  return join(here, "modules", `${name}.wasm`);
+}
 
 const IO_CAP = 64;
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -53,9 +64,19 @@ function hexToBytes(hex) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("run.mjs")) {
-  const [file, hash, inputHex] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  let file;
+  let hash;
+  let inputHex;
+  if (args.length === 2) {
+    hash = args[0];
+    file = moduleFile(hash);
+    inputHex = args[1];
+  } else if (args.length === 3) {
+    [file, hash, inputHex] = args;
+  }
   if (!file || !hash || !inputHex) {
-    console.error("usage: node run.mjs <wasm-file> <sha256-hex> <input-hex>");
+    console.error("usage: node run.mjs <sha256-hex> <input-hex>");
     process.exit(1);
   }
   const output = await runWasm({ file, hash, input: hexToBytes(inputHex) });

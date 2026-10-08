@@ -4,7 +4,7 @@
 
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 const MAX_SOURCE = 32_000;
 const here = dirname(fileURLToPath(import.meta.url));
 const ascBin = join(here, "..", "node_modules", "assemblyscript", "bin", "asc.js");
+const modulesDir = join(here, "..", "..", "worker", "modules");
 
 function runAsc(args) {
   return new Promise((resolve) => {
@@ -63,6 +64,9 @@ export async function compileSource(source) {
     }
     const bytes = await readFile(output);
     const hash = createHash("sha256").update(bytes).digest("hex");
+    if (!/^[0-9a-f]{64}$/.test(hash)) throw new Error("Compile failed.");
+    await mkdir(modulesDir, { recursive: true });
+    await writeFile(join(modulesDir, `${hash}.wasm`), bytes);
     return { hash, bytes };
   } finally {
     await rm(dir, { recursive: true, force: true });

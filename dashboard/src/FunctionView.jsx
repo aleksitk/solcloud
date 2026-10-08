@@ -79,6 +79,7 @@ export default function FunctionView({ onUse }) {
               <div>
                 <span>Wasm hash</span>
                 <code>{compiled.hash}</code>
+                <span className="fn-saved">Saved for the nodes on this machine.</span>
               </div>
               <button type="button" className="path-open" onClick={onUse}>
                 Use for a new task
