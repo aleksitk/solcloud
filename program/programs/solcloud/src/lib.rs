@@ -32,6 +32,7 @@ pub mod solcloud {
         cfg.slash_bps = slash_bps;
         cfg.node_count = 0;
         cfg.task_count = 0;
+        cfg.active_nodes = Vec::new();
         cfg.bump = ctx.bumps.config;
         Ok(())
     }
@@ -64,7 +65,73 @@ pub mod solcloud {
             .node_count
             .checked_add(1)
             .ok_or(SolCloudError::Overflow)?;
+        push_active_node(&mut ctx.accounts.config, ctx.accounts.owner.key())?;
         Ok(())
+    }
+
+    /// Grow the live config account so `active_nodes` can be read.
+    ///
+    /// The devnet config was created before that field. Call this once after the
+    /// upgrade, before register, index, request, or finalize. New bytes are zero,
+    /// which is an empty list.
+    pub fn extend_registry(ctx: Context<ExtendRegistry>) -> Result<()> {
+        let info = ctx.accounts.config.to_account_info();
+        let target = 8 + Config::INIT_SPACE;
+        let current = info.data_len();
+        require!(current <= target, SolCloudError::Overflow);
+        if current == target {
+            return Ok(());
+        }
+
+        let authority = {
+            let data = info.try_borrow_data()?;
+            require!(data.len() >= 40, SolCloudError::InvalidTaskState);
+            Pubkey::try_from(&data[8..40]).map_err(|_| error!(SolCloudError::InvalidTaskState))?
+        };
+        require!(
+            ctx.accounts.authority.key() == authority,
+            SolCloudError::BadAuthority
+        );
+        require!(info.owner == ctx.program_id, SolCloudError::InvalidCommitteeNode);
+        let (pda, _) = Pubkey::find_program_address(&[CONFIG_SEED], ctx.program_id);
+        require!(info.key() == pda, SolCloudError::InvalidCommitteeNode);
+
+        let rent = Rent::get()?;
+        let due = rent
+            .minimum_balance(target)
+            .saturating_sub(info.lamports());
+        if due > 0 {
+            transfer_from_signer(
+                &ctx.accounts.system_program,
+                &ctx.accounts.authority,
+                &info,
+                due,
+            )?;
+        }
+        info.resize(target)?;
+        let mut data = info.try_borrow_mut_data()?;
+        for byte in data.iter_mut().skip(current) {
+            *byte = 0;
+        }
+        Ok(())
+    }
+
+    /// Put an already-registered active node onto `config.active_nodes`.
+    ///
+    /// `register_node` does this for new nodes. The three nodes already on devnet
+    /// need this once, signed by the config authority.
+    pub fn index_node(ctx: Context<IndexNode>) -> Result<()> {
+        let owner = ctx.accounts.node.owner;
+        require!(
+            ctx.accounts.node.status == NodeStatus::Active,
+            SolCloudError::NodeNotActive
+        );
+        let (pda, _) = Pubkey::find_program_address(
+            &[NODE_SEED, owner.as_ref()],
+            ctx.program_id,
+        );
+        require!(pda == ctx.accounts.node.key(), SolCloudError::InvalidCommitteeNode);
+        push_active_node(&mut ctx.accounts.config, owner)
     }
 
     /// A dApp requests an off-chain computation and escrows the reward.
@@ -463,6 +530,18 @@ fn sha256(data: &[u8]) -> [u8; 32] {
     hash(data).to_bytes()
 }
 
+fn push_active_node(config: &mut Config, owner: Pubkey) -> Result<()> {
+    if config.active_nodes.contains(&owner) {
+        return Ok(());
+    }
+    require!(
+        config.active_nodes.len() < MAX_ACTIVE_NODES,
+        SolCloudError::RegistryFull
+    );
+    config.active_nodes.push(owner);
+    Ok(())
+}
+
 fn transfer_from_signer<'info>(
     system_program: &Program<'info, System>,
     from: &Signer<'info>,
@@ -501,6 +580,26 @@ fn move_lamports(from: &AccountInfo, to: &AccountInfo, amount: u64) -> Result<()
 }
 
 // ----------------------------- Accounts contexts -----------------------------
+
+#[derive(Accounts)]
+pub struct ExtendRegistry<'info> {
+    /// CHECK: the live account is still the old size, so it cannot be deserialized as Config yet.
+    #[account(mut)]
+    pub config: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct IndexNode<'info> {
+    #[account(mut, seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    #[account(seeds = [NODE_SEED, node.owner.as_ref()], bump = node.bump)]
+    pub node: Account<'info, NodeAccount>,
+    #[account(address = config.authority)]
+    pub authority: Signer<'info>,
+}
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {

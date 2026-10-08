@@ -40,6 +40,10 @@ pub struct Config {
     /// Slash fraction in basis points (e.g. 5000 = 50%).
     pub slash_bps: u16,
     pub bump: u8,
+    /// Owners of nodes that joined after this field existed, plus any indexed earlier nodes.
+    /// Appended at the end so an older config account can be extended with zeros.
+    #[max_len(32)]
+    pub active_nodes: Vec<Pubkey>,
 }
 
 /// A staked worker node (PDA, seed = "node" ++ owner).

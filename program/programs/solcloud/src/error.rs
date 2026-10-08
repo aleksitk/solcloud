@@ -40,4 +40,8 @@ pub enum SolCloudError {
     InvalidCommitteeNode,
     #[msg("Finalize accounts do not match the committee.")]
     BadFinalizeAccounts,
+    #[msg("The node registry is full.")]
+    RegistryFull,
+    #[msg("Only the config authority can do this.")]
+    BadAuthority,
 }

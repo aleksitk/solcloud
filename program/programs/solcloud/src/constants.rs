@@ -4,6 +4,8 @@ use anchor_lang::prelude::*;
 pub const MIN_COMMITTEE_SIZE: u8 = 3;
 /// Maximum committee size a requester may choose.
 pub const MAX_COMMITTEE_SIZE: u8 = 11;
+/// How many active node owners Config can remember. Demo cap.
+pub const MAX_ACTIVE_NODES: usize = 32;
 
 /// Max byte length of a task input (kept small — travels in the transaction).
 pub const MAX_INPUT_LEN: usize = 64;

@@ -66,6 +66,7 @@
   - [x] Validate `committee_size` is odd and within [3, 11]
   - [x] Require enough registered/available nodes for the chosen `N`
 - [x] Committee selection: the dashboard reads the nodes that are active at request time, ranks them by reputation, and breaks a tie with the latest block hash. The program still receives that list and checks each node. Reputation stays 0 until a round updates it
+- [ ] On-chain committee, part 1 is in the program and not deployed: `Config.active_nodes`, `extend_registry`, `index_node`. Part 2: `request_task` derives the committee from that list and a slot seed, then rejects a different remaining-accounts list. Not a VRF. A requester can still grind `task_id`. With only 3 nodes and N=3 every node is selected
 - [x] `commit_result(task_id, hash_commitment)` — node submits commit
 - [x] `reveal_result(task_id, result, nonce)` — node reveals answer
 - [x] Finalize logic: **M-of-N majority** check (`threshold = N/2 + 1`), create `TaskResult`
