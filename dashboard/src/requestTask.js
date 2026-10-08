@@ -288,10 +288,17 @@ export async function findNode(owner) {
   return { address: node.toBase58(), stake: data.readBigUInt64LE(40) };
 }
 
+// Nodes created before tasks_slashed are 66 bytes. Finalize grows them to 74.
+async function nodeAccounts() {
+  const [current, grown] = await Promise.all([
+    withRetries(() => connection.getProgramAccounts(PROGRAM_ID, { filters: [{ dataSize: 66 }] })),
+    withRetries(() => connection.getProgramAccounts(PROGRAM_ID, { filters: [{ dataSize: 74 }] })),
+  ]);
+  return [...current, ...grown];
+}
+
 export async function readNodes() {
-  const accounts = await withRetries(() =>
-    connection.getProgramAccounts(PROGRAM_ID, { filters: [{ dataSize: 66 }] })
-  );
+  const accounts = await nodeAccounts();
   const known = new Map(NODE_OWNERS.map((owner, index) => [owner, index]));
   const nodes = accounts.map(({ pubkey, account }) => {
     const data = Buffer.from(account.data);

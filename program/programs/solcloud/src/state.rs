@@ -56,6 +56,9 @@ pub struct NodeAccount {
     pub reputation: i64,
     pub tasks_completed: u64,
     pub bump: u8,
+    /// Rounds this node lost after a majority existed.
+    /// Appended so an older 66-byte node account can be extended with zeros.
+    pub tasks_slashed: u64,
 }
 
 /// A compute task (PDA, seed = "task" ++ task_id).

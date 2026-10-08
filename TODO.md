@@ -74,7 +74,7 @@
 - [ ] Marketplace fields. Every stat on the site must come from data the protocol already checked (reveal time, a slash), never from a number the node reports about itself (`state.rs`, `lib.rs`)
   - [x] Add `revealed_at: i64` to `CommitAccount`. Set it in `reveal_result` when the reveal is stored. In the program, not deployed
   - [x] In `finalize`, increment `tasks_completed` on each winning node. The field exists and is never written. In the program, not deployed
-  - [ ] Add `tasks_slashed: u64` to `NodeAccount`. Increment it for each losing node in the slash loop. The client computes success rate as `tasks_completed / (tasks_completed + tasks_slashed)`
+  - [x] Add `tasks_slashed: u64` to `NodeAccount`. Increment it for each losing node in the slash loop. The client computes success rate as `tasks_completed / (tasks_completed + tasks_slashed)`. In the program, not deployed
 
 ### Worker node (TypeScript)
 - [ ] Solana RPC/WebSocket listener for new tasks

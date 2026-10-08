@@ -57,6 +57,7 @@ pub mod solcloud {
         node.status = NodeStatus::Active;
         node.reputation = 0;
         node.tasks_completed = 0;
+        node.tasks_slashed = 0;
         node.bump = ctx.bumps.node;
 
         ctx.accounts.config.node_count = ctx
@@ -121,11 +122,9 @@ pub mod solcloud {
     /// `register_node` does this for new nodes. The three nodes already on devnet
     /// need this once, signed by the config authority.
     pub fn index_node(ctx: Context<IndexNode>) -> Result<()> {
-        let owner = ctx.accounts.node.owner;
-        require!(
-            ctx.accounts.node.status == NodeStatus::Active,
-            SolCloudError::NodeNotActive
-        );
+        let node = load_node(&ctx.accounts.node.to_account_info(), ctx.program_id)?;
+        let owner = node.owner;
+        require!(node.status == NodeStatus::Active, SolCloudError::NodeNotActive);
         let (pda, _) = Pubkey::find_program_address(
             &[NODE_SEED, owner.as_ref()],
             ctx.program_id,
@@ -234,10 +233,9 @@ pub mod solcloud {
     ) -> Result<()> {
         let clock = Clock::get()?;
         let owner = ctx.accounts.owner.key();
-        require!(
-            ctx.accounts.node.status == NodeStatus::Active,
-            SolCloudError::NodeNotActive
-        );
+        let node = load_node(&ctx.accounts.node.to_account_info(), ctx.program_id)?;
+        require!(node.owner == owner, SolCloudError::InvalidCommitteeNode);
+        require!(node.status == NodeStatus::Active, SolCloudError::NodeNotActive);
         require!(
             ctx.accounts.task.committee.contains(&owner),
             SolCloudError::NotInCommittee
@@ -509,14 +507,45 @@ pub mod solcloud {
     }
 }
 
+fn load_node(acc: &AccountInfo, program_id: &Pubkey) -> Result<NodeAccount> {
+    require!(acc.owner == program_id, SolCloudError::InvalidCommitteeNode);
+    let node = read_node(acc)?;
+    let (pda, _) = Pubkey::find_program_address(&[NODE_SEED, node.owner.as_ref()], program_id);
+    require!(pda == acc.key(), SolCloudError::InvalidCommitteeNode);
+    Ok(node)
+}
+
 fn read_node(acc: &AccountInfo) -> Result<NodeAccount> {
     let data = acc.try_borrow_data()?;
+    // A node created before `tasks_slashed` is exactly `INIT_SPACE` bytes.
+    // The missing counter is zero. `finalize` grows the account when it writes.
+    if data.len() == NodeAccount::INIT_SPACE {
+        let mut padded = data.to_vec();
+        padded.extend_from_slice(&[0u8; 8]);
+        let mut slice: &[u8] = &padded;
+        return NodeAccount::try_deserialize(&mut slice)
+            .map_err(|_| error!(SolCloudError::InvalidCommitteeNode));
+    }
     let mut slice: &[u8] = &data;
-    NodeAccount::try_deserialize(&mut slice)
-        .map_err(|_| error!(SolCloudError::InvalidCommitteeNode))
+    NodeAccount::try_deserialize(&mut slice).map_err(|_| error!(SolCloudError::InvalidCommitteeNode))
+}
+
+fn grow_node(acc: &AccountInfo) -> Result<()> {
+    let target = 8 + NodeAccount::INIT_SPACE;
+    let current = acc.data_len();
+    if current >= target {
+        return Ok(());
+    }
+    acc.resize(target)?;
+    let mut data = acc.try_borrow_mut_data()?;
+    for byte in data.iter_mut().skip(current) {
+        *byte = 0;
+    }
+    Ok(())
 }
 
 fn note_task_completed(acc: &AccountInfo) -> Result<()> {
+    grow_node(acc)?;
     let mut node = read_node(acc)?;
     node.tasks_completed = node
         .tasks_completed
@@ -528,6 +557,7 @@ fn note_task_completed(acc: &AccountInfo) -> Result<()> {
 }
 
 fn reduce_stake(acc: &AccountInfo, slash_bps: u16) -> Result<u64> {
+    grow_node(acc)?;
     let mut node = read_node(acc)?;
     let slashed = node
         .stake_amount
@@ -541,6 +571,10 @@ fn reduce_stake(acc: &AccountInfo, slash_bps: u16) -> Result<u64> {
     if node.stake_amount == 0 {
         node.status = NodeStatus::Slashed;
     }
+    node.tasks_slashed = node
+        .tasks_slashed
+        .checked_add(1)
+        .ok_or(SolCloudError::Overflow)?;
     let mut data = acc.try_borrow_mut_data()?;
     node.try_serialize(&mut &mut data[..])?;
     Ok(slashed)
@@ -651,8 +685,8 @@ pub struct ExtendRegistry<'info> {
 pub struct IndexNode<'info> {
     #[account(mut, seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Account<'info, Config>,
-    #[account(seeds = [NODE_SEED, node.owner.as_ref()], bump = node.bump)]
-    pub node: Account<'info, NodeAccount>,
+    /// CHECK: an existing node PDA. It may still be the pre-tasks_slashed size. The handler checks it.
+    pub node: UncheckedAccount<'info>,
     #[account(address = config.authority)]
     pub authority: Signer<'info>,
 }
@@ -722,8 +756,8 @@ pub struct CommitResult<'info> {
         bump
     )]
     pub commit: Account<'info, CommitAccount>,
-    #[account(seeds = [NODE_SEED, owner.key().as_ref()], bump = node.bump)]
-    pub node: Account<'info, NodeAccount>,
+    /// CHECK: the signer's node PDA. An older account has no tasks_slashed field and is read as zero.
+    pub node: UncheckedAccount<'info>,
     #[account(mut)]
     pub owner: Signer<'info>,
     pub system_program: Program<'info, System>,
