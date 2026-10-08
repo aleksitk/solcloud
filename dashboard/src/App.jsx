@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Aurora from "./Aurora.jsx";
+import Field from "./Field.jsx";
 import FunctionView from "./FunctionView.jsx";
 import LaunchForm from "./LaunchForm.jsx";
 import { MazeSummary, MazeView } from "./MazePath.jsx";
@@ -10,6 +11,23 @@ import StakeForm from "./StakeForm.jsx";
 import WalletButton from "./WalletButton.jsx";
 
 const PROGRAM_ID = "D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ";
+
+const FACTS = [
+  "Commit, then reveal",
+  "Committee of 3, 5, 7, 9, or 11",
+  "Majority is half plus one",
+  "A mismatch loses stake",
+  "The same Wasm on every node",
+  "The reward stays in escrow",
+  "Settled on Solana devnet",
+];
+
+const STEPS = [
+  ["01", "Request", "The wallet locks the reward and names the committee."],
+  ["02", "Commit", "Each node posts a hash. The output stays hidden."],
+  ["03", "Reveal", "The output opens. The hash has to match the commit."],
+  ["04", "Settle", "The majority is paid. A mismatch loses stake."],
+];
 
 function explorerAddress(address) {
   return `https://explorer.solana.com/address/${address}?cluster=devnet`;
@@ -33,7 +51,8 @@ export default function App() {
   const [view, setView] = useState("home");
 
   return (
-    <div>
+    <div className="app">
+      <Field />
       <header className="site-header">
         <div className="shell header-row">
           <button className="brand" type="button" onClick={() => setView("home")}>
@@ -63,6 +82,7 @@ export default function App() {
         </div>
       </header>
 
+      <main className="page" key={view}>
       {view === "launch" ? (
         <LaunchForm onOpenFunction={() => setView("functions")} />
       ) : view === "stake" ? (
@@ -115,14 +135,59 @@ export default function App() {
         </div>
       </section>
 
+      <div className="marquee">
+        <div className="marquee-track">
+          {[0, 1].map((copy) => (
+            <ul key={copy} aria-hidden={copy === 1}>
+              {FACTS.map((fact) => (
+                <li key={`${copy}-${fact}`}>{fact}</li>
+              ))}
+            </ul>
+          ))}
+        </div>
+      </div>
+
+      <section className="shell flow">
+        <p className="kicker">The round</p>
+        <h2>Four moves. One majority.</h2>
+        <div className="flow-steps">
+          <span className="flow-glow" aria-hidden="true" />
+          <ol>
+            {STEPS.map(([index, title, copy]) => (
+              <li key={index}>
+                <span>{index}</span>
+                <strong>{title}</strong>
+                <p>{copy}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
       <section className="shell below">
         <RoundStatus />
         <MazeSummary onOpen={() => setView("map")} />
         <RoundHistory />
         <NodeList />
       </section>
+
+      <section className="shell close">
+        <div>
+          <p className="kicker">Start</p>
+          <h2>Escrow a round, or stake a node.</h2>
+        </div>
+        <div className="close-actions">
+          <button type="button" className="submit" onClick={() => setView("launch")}>
+            New task
+          </button>
+          <button type="button" className="close-ghost" onClick={() => setView("stake")}>
+            Stake
+          </button>
+        </div>
+      </section>
       </>
       )}
+      </main>
     </div>
   );
 }
