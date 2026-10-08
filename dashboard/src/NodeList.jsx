@@ -43,8 +43,8 @@ export default function NodeList() {
   return (
     <div className="ledger-follow">
       <div className="ledger-head">
-        <h2>Staked nodes</h2>
-        <span>Devnet · {nodes.length}</span>
+        <h2>Nodes</h2>
+        <span>{nodes.length} staked</span>
       </div>
       <div className="sheet">
         <div className="sheet-head nodes-head">

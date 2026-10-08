@@ -45,7 +45,7 @@ export default function Field() {
           const dist = Math.hypot(dx, dy);
           if (dist > reach) continue;
           const alpha = (1 - dist / reach) * 0.28;
-          ctx.strokeStyle = `rgba(168, 120, 255, ${alpha})`;
+          ctx.strokeStyle = `rgba(92, 62, 148, ${alpha * 0.85})`;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(a.x * width, a.y * height);
@@ -54,7 +54,7 @@ export default function Field() {
         }
       }
       for (const point of points) {
-        ctx.fillStyle = "rgba(244, 241, 234, 0.72)";
+        ctx.fillStyle = "rgba(23, 21, 28, 0.55)";
         ctx.beginPath();
         ctx.arc(point.x * width, point.y * height, 1.6, 0, Math.PI * 2);
         ctx.fill();

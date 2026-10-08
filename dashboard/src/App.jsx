@@ -40,8 +40,8 @@ function short(value) {
 function Mark() {
   return (
     <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
-      <rect x="4" y="6" width="5" height="20" rx="1.5" fill="#f4f1ea" />
-      <rect x="13.5" y="6" width="5" height="20" rx="1.5" fill="#f4f1ea" />
+      <rect x="4" y="6" width="5" height="20" rx="1.5" fill="#17151c" />
+      <rect x="13.5" y="6" width="5" height="20" rx="1.5" fill="#17151c" />
       <rect x="23" y="14" width="5" height="12" rx="1.5" fill="#e07a5f" />
     </svg>
   );
@@ -164,11 +164,22 @@ export default function App() {
         </div>
       </section>
 
-      <section className="shell below">
-        <RoundStatus />
-        <MazeSummary onOpen={() => setView("map")} />
-        <RoundHistory />
-        <NodeList />
+      <section className="shell network">
+        <div className="network-intro">
+          <p className="kicker">Network</p>
+          <h2>Live on devnet.</h2>
+          <p>The open round, the settled history, and the nodes that can be called.</p>
+        </div>
+        <div className="network-grid">
+          <div className="panel">
+            <RoundStatus />
+            <MazeSummary onOpen={() => setView("map")} />
+            <RoundHistory />
+          </div>
+          <div className="panel">
+            <NodeList />
+          </div>
+        </div>
       </section>
 
       <section className="shell close">

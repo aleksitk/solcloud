@@ -39,8 +39,8 @@ export default function RoundHistory() {
   return (
     <>
       <div className="ledger-head">
-        <h2>Settled rounds</h2>
-        <span>{rounds ? `Devnet · ${rounds.length}` : "Devnet"}</span>
+        <h2>History</h2>
+        <span>{rounds ? `${rounds.length} settled` : "Settled"}</span>
       </div>
       {!rounds ? (
         <p className="live-note">{note}</p>
