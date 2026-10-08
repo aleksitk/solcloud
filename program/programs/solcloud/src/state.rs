@@ -97,6 +97,9 @@ pub struct CommitAccount {
     pub revealed: bool,
     pub submitted_at: i64,
     pub bump: u8,
+    /// Unix time of the reveal. Zero until then.
+    /// Appended so an older commit account still deserializes: its spare tail reads as zero.
+    pub revealed_at: i64,
 }
 
 /// The finalized, verified result of a task (PDA, seed = "result" ++ task).

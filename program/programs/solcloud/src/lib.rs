@@ -260,6 +260,7 @@ pub mod solcloud {
         commit.nonce = 0;
         commit.revealed = false;
         commit.submitted_at = clock.unix_timestamp;
+        commit.revealed_at = 0;
         commit.bump = ctx.bumps.commit;
 
         let task = &mut ctx.accounts.task;
@@ -307,6 +308,7 @@ pub mod solcloud {
         commit.nonce = nonce;
         commit.output_hash = sha256(&commit.output);
         commit.revealed = true;
+        commit.revealed_at = clock.unix_timestamp;
 
         let task = &mut ctx.accounts.task;
         task.reveal_count = task

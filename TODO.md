@@ -71,6 +71,10 @@
 - [x] `reveal_result(task_id, result, nonce)` — node reveals answer
 - [x] Finalize logic: **M-of-N majority** check (`threshold = N/2 + 1`), create `TaskResult`
 - [x] Reward distribution across the matching (correct) nodes
+- [ ] Marketplace fields. Every stat on the site must come from data the protocol already checked (reveal time, a slash), never from a number the node reports about itself (`state.rs`, `lib.rs`)
+  - [x] Add `revealed_at: i64` to `CommitAccount`. Set it in `reveal_result` when the reveal is stored. In the program, not deployed
+  - [ ] In `finalize`, increment `tasks_completed` on each winning node. The field exists and is never written
+  - [ ] Add `tasks_slashed: u64` to `NodeAccount`. Increment it for each losing node in the slash loop. The client computes success rate as `tasks_completed / (tasks_completed + tasks_slashed)`
 
 ### Worker node (TypeScript)
 - [ ] Solana RPC/WebSocket listener for new tasks
@@ -122,6 +126,19 @@
 - [x] Consumer path for the latest maze round. The home page keeps a labeled row; Open map shows the entrance and exit on their own view. Length 35628 matches the nodes
 - [x] Responsive layout for a phone-width screen: header, hero, round rows, and the task form
 - [x] Show committee size + threshold clearly per task (e.g. "3 of 3", need 2). The settled list and the latest-round card both show it
+
+### Node operators and requesters
+
+Two paths on the site that already exists. No new instruction beyond the three marketplace fields in Phase 3. The same rule: show only what the chain already recorded.
+
+- [ ] My Node: stake, status (active or slashed), tasks completed, tasks slashed, and the success rate
+- [ ] Task history for the connected node, from its commit accounts. Each row is a task id, committee size, outcome (won, slashed, or timed out), and time-to-reveal (`revealed_at` minus the task's `created_at`)
+- [ ] Average completion time: the mean of those reveal times on finalized tasks. The node browser sorts with this. The node does not submit the number
+- [ ] Environment check: the operator runs `worker/check.mjs` on their own machine before staking. My Node shows pass or fail once. That result is not a filter
+- [ ] My Requests: tasks this wallet created. Task id, status, reward, and a link to the result
+- [ ] Node browser: every active node, with success rate, average completion time, stake, and the committee sizes it can be drawn into. Each column sorts
+- [ ] Speed class (fast, standard, slow) is a third of the active nodes by completion time: top, middle, bottom. No fixed millisecond cutoff
+- [ ] Homepage: "Rent out your hardware" opens registration and My Node. "Run a computation" opens the task form, the node browser, and My Requests. Two routes, not a new layout
 
 ---
 
@@ -184,3 +201,9 @@ The chain already accepts any Wasm hash. The labyrinth stays the built-in demo: 
 6. Configurable committee UI could fall back to a few preset sizes (3/5/11) if time is short
 
 **Never cut:** the live slashing demo — it's the core of the project.
+
+**Do not build before the deadline.** These are pitch points, not missing work.
+
+- Star ratings or written reviews. Consensus and slashing already record whether the node matched, and the reveal time records how long it took. A review would also need its own spam protection. Say this as a difference from a normal marketplace, not as a gap
+- A hardware sheet or a benchmark the node submits about itself. What the chain can stand behind is how fast the node finished and how often it matched the majority
+- Any new on-chain instruction besides the three marketplace fields in Phase 3. Everything else in that section only reads accounts
