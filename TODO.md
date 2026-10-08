@@ -74,7 +74,7 @@
 ### Worker node (TypeScript)
 - [ ] Solana RPC/WebSocket listener for new tasks
 - [ ] Download Wasm file and verify hash
-- [ ] Run in Node.js WebAssembly: worker thread + timeout
+- [ ] Run in Node.js WebAssembly: worker thread + timeout (the runner in `worker/` does this; it does not listen for tasks yet)
 - [ ] Build and send commit transaction
 - [ ] Build and send reveal transaction (after commit window)
 - [ ] Logging (task ID, time, result)
@@ -129,7 +129,7 @@
 The chain already accepts any Wasm hash. The labyrinth stays the built-in demo: the map view draws only that program. Another function is a second AssemblyScript module with one shared export. The editor is a text field and a Compile button, not a full IDE.
 
 - [x] One ABI: `alloc` plus `run`. Input and output are capped at 64 bytes. The maze's `run` takes the 12-byte seed and size and returns the same 12-byte path result as `solve`. All 8 vectors match. Module hash `ee0b3e4c3ede257e3719c52deee27528ea791218cdea3a5802fd52bf9ce5057a`. Rounds already on devnet keep the previous hash
-- [ ] A node runner loads a Wasm file with that export, checks the SHA-256, and runs it on a worker thread with a timeout
+- [x] A node runner loads a Wasm file with that export, checks the SHA-256, and runs it on a worker thread with a timeout. `worker/check.mjs` matches the maze vector (seed 1, size 512, length 35628), rejects a wrong hash, and stops a run that passes the timeout
 - [ ] Dashboard editor: AssemblyScript source, compile with `asc`, show the hash, and use that hash on the next task
 - [ ] For the demo, the compiled file stays on the machine the nodes read. Public hosting is still the Phase 1 item (IPFS/Arweave/HTTPS)
 - [ ] Keep the labyrinth registered. Tasks that are not the maze show the output bytes, not the map
