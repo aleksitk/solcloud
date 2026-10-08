@@ -1,6 +1,6 @@
-// Step 4: each of the three nodes submits sha256(output || nonce).
-// Run from Ubuntu:
-//   node scripts/commit-result.cjs
+// Each of the three nodes submits sha256(output || nonce) for one task.
+// Run from Ubuntu, in the program folder:
+//   node scripts/commit-result.cjs 5
 
 const crypto = require("crypto");
 const fs = require("fs");
@@ -17,7 +17,11 @@ const {
 
 const PROGRAM_ID = new PublicKey("D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ");
 const RPC = "https://api.devnet.solana.com";
-const TASK_ID = 2n;
+if (!process.argv[2]) {
+  console.error("usage: node scripts/commit-result.cjs <task-id>");
+  process.exit(1);
+}
+const TASK_ID = BigInt(process.argv[2]);
 // seed=1, size=512 from wasm/testvectors/vectors.json
 const PATH_LENGTH = 35628;
 const PATH_HASH = 0xea340764c91ec770n;
@@ -52,6 +56,18 @@ function commitment(nonce) {
   return crypto.createHash("sha256").update(Buffer.concat([outputBytes(), u64(nonce)])).digest();
 }
 
+async function retry(label, fn) {
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt === 5) throw err;
+      console.log(`${label} failed, retry ${attempt}/5`);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+}
+
 async function main() {
   const home = path.join(os.homedir(), ".config", "solana");
   const connection = new Connection(RPC, "confirmed");
@@ -73,7 +89,7 @@ async function main() {
       PROGRAM_ID
     );
 
-    const existing = await connection.getAccountInfo(commitPda);
+    const existing = await retry("commit", () => connection.getAccountInfo(commitPda));
     if (existing) {
       console.log(`node ${n} already committed:`, commitPda.toBase58());
       continue;
@@ -95,9 +111,10 @@ async function main() {
       ]),
     });
 
-    const tx = new Transaction().add(ix);
-    const signature = await connection.sendTransaction(tx, [owner]);
-    await connection.confirmTransaction(signature, "confirmed");
+    const signature = await retry("send", () =>
+      connection.sendTransaction(new Transaction().add(ix), [owner])
+    );
+    await retry("confirm", () => connection.confirmTransaction(signature, "confirmed"));
     console.log(`node ${n} signature:`, signature);
     console.log(`node ${n} commit:`, commitPda.toBase58());
   }

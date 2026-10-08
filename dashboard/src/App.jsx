@@ -7,6 +7,15 @@ const PROGRAM_ID = "D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ";
 
 const proofs = [
   {
+    id: "05",
+    status: "Finalized",
+    tone: "good",
+    title: "Majority paid",
+    agreement: "3 of 3",
+    effect: "+0.0167 SOL",
+    address: "75Dtq2i5ZTmLigiCT97yKWxBeJToBpf1XA69FDCDf26Z",
+  },
+  {
     id: "02",
     status: "Finalized",
     tone: "good",
@@ -139,7 +148,7 @@ export default function App() {
       <section className="shell below">
         <div className="ledger-head">
           <h2>Settled rounds</h2>
-          <span>Devnet · 4</span>
+          <span>Devnet · {proofs.length}</span>
         </div>
         <div className="sheet">
           <div className="sheet-head">

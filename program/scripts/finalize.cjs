@@ -1,6 +1,7 @@
-// Step 6: tally the three reveals, store the result, and pay the matching nodes.
-// Run from Ubuntu:
-//   node scripts/finalize.cjs
+// Tally the reveals, store the result, and pay the matching nodes.
+// The requester is read from the task, so a dashboard wallet can differ from id.json.
+// Run from Ubuntu, in the program folder:
+//   node scripts/finalize.cjs 5
 
 const crypto = require("crypto");
 const fs = require("fs");
@@ -18,7 +19,11 @@ const {
 
 const PROGRAM_ID = new PublicKey("D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ");
 const RPC = "https://api.devnet.solana.com";
-const TASK_ID = 2n;
+if (!process.argv[2]) {
+  console.error("usage: node scripts/finalize.cjs <task-id>");
+  process.exit(1);
+}
+const TASK_ID = BigInt(process.argv[2]);
 
 function discriminator(name) {
   return crypto.createHash("sha256").update(`global:${name}`).digest().subarray(0, 8);
@@ -33,6 +38,18 @@ function u64(value) {
 function loadKeypair(file) {
   const secret = Uint8Array.from(JSON.parse(fs.readFileSync(file, "utf8")));
   return Keypair.fromSecretKey(secret);
+}
+
+async function retry(label, fn) {
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt === 5) throw err;
+      console.log(`${label} failed, retry ${attempt}/5`);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
 }
 
 async function main() {
@@ -50,11 +67,15 @@ async function main() {
     PROGRAM_ID
   );
 
-  const existing = await connection.getAccountInfo(result);
+  const existing = await retry("result", () => connection.getAccountInfo(result));
   if (existing) {
     console.log("result already exists:", result.toBase58());
     return;
   }
+
+  const taskInfo = await retry("task", () => connection.getAccountInfo(task));
+  if (!taskInfo) throw new Error("task account is missing");
+  const requester = new PublicKey(taskInfo.data.subarray(8, 40));
 
   const owners = [1, 2, 3].map((n) =>
     loadKeypair(path.join(home, `solcloud-node${n}.json`))
@@ -69,7 +90,7 @@ async function main() {
 
   const before = [];
   for (const pair of pairs) {
-    before.push(await connection.getBalance(pair.owner));
+    before.push(await retry("balance", () => connection.getBalance(pair.owner)));
   }
 
   const ix = new TransactionInstruction({
@@ -83,7 +104,7 @@ async function main() {
         isWritable: false,
       },
       { pubkey: payer.publicKey, isSigner: false, isWritable: true },
-      { pubkey: payer.publicKey, isSigner: false, isWritable: true },
+      { pubkey: requester, isSigner: false, isWritable: true },
       { pubkey: payer.publicKey, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ...pairs.flatMap(({ commitPda, owner }) => {
@@ -101,14 +122,16 @@ async function main() {
     data: Buffer.concat([discriminator("finalize"), u64(TASK_ID)]),
   });
 
-  const tx = new Transaction().add(ix);
-  const signature = await connection.sendTransaction(tx, [payer]);
-  await connection.confirmTransaction(signature, "confirmed");
+  const signature = await retry("send", () =>
+    connection.sendTransaction(new Transaction().add(ix), [payer])
+  );
+  await retry("confirm", () => connection.confirmTransaction(signature, "confirmed"));
 
   console.log("result:", result.toBase58());
   console.log("signature:", signature);
+  console.log("requester:", requester.toBase58());
   for (let i = 0; i < owners.length; i++) {
-    const after = await connection.getBalance(pairs[i].owner);
+    const after = await retry("balance", () => connection.getBalance(pairs[i].owner));
     const gained = (after - before[i]) / LAMPORTS_PER_SOL;
     console.log(`node ${i + 1} gained SOL:`, gained);
   }
