@@ -40,8 +40,8 @@ function short(value) {
 function Mark() {
   return (
     <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
-      <rect x="4" y="6" width="5" height="20" rx="1.5" fill="#17151c" />
-      <rect x="13.5" y="6" width="5" height="20" rx="1.5" fill="#17151c" />
+      <rect x="4" y="6" width="5" height="20" rx="1.5" fill="#1c2128" />
+      <rect x="13.5" y="6" width="5" height="20" rx="1.5" fill="#1c2128" />
       <rect x="23" y="14" width="5" height="12" rx="1.5" fill="#e07a5f" />
     </svg>
   );

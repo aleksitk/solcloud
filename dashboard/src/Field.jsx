@@ -45,7 +45,7 @@ export default function Field() {
           const dist = Math.hypot(dx, dy);
           if (dist > reach) continue;
           const alpha = (1 - dist / reach) * 0.28;
-          ctx.strokeStyle = `rgba(92, 62, 148, ${alpha * 0.85})`;
+          ctx.strokeStyle = `rgba(70, 84, 98, ${alpha * 0.75})`;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(a.x * width, a.y * height);

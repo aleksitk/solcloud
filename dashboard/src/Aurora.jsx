@@ -48,13 +48,10 @@ export default function Aurora() {
       const width = canvas.offsetWidth;
       const height = canvas.offsetHeight;
       ctx.clearRect(0, 0, width, height);
-      ctx.globalCompositeOperation = "lighter";
-      stroke(ctx, width, height, time, 36, "rgba(20, 241, 149, 0.45)", 34, 36);
-      stroke(ctx, width, height, time + 0.35, 0, "rgba(153, 69, 255, 0.72)", 28, 24);
-      stroke(ctx, width, height, time + 0.35, -8, "rgba(220, 31, 255, 0.85)", 6, 12);
       ctx.globalCompositeOperation = "source-over";
       ctx.shadowBlur = 0;
-      stroke(ctx, width, height, time + 0.35, 2, "rgba(8, 0, 16, 0.82)", 16, 0);
+      stroke(ctx, width, height, time, 24, "rgba(70, 84, 98, 0.16)", 18, 0);
+      stroke(ctx, width, height, time + 0.35, 0, "rgba(31, 92, 72, 0.45)", 1.5, 0);
     }
 
     function frame() {
