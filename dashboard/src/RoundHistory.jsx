@@ -69,12 +69,14 @@ export default function RoundHistory() {
                 </b>
                 <em>{round.title}</em>
               </span>
-              <span className="mono agree">
-                <b>{round.agreement}</b>
-                <em>need {round.threshold}</em>
+              <span className="row-meta">
+                <span className="mono agree">
+                  <b>{round.agreement}</b>
+                  <em>need {round.threshold}</em>
+                </span>
+                <span className={`mono amount ${round.tone}`}>{round.effect}</span>
+                <span className="go">Explorer</span>
               </span>
-              <span className={`mono amount ${round.tone}`}>{round.effect}</span>
-              <span className="go">Explorer</span>
             </a>
           ))}
         </div>

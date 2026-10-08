@@ -119,7 +119,7 @@
 - [x] Slashing visual on the hero round (node 3 pulses). Settled rounds, including the slash and the refunds, are read from devnet
 - [x] Transaction links (Solana Explorer, devnet)
 - [ ] Consumer dApp visualization (e.g. labyrinth map + path)
-- [ ] Responsive, polished UI for presentation
+- [x] Responsive layout for a phone-width screen: header, hero, round rows, and the task form
 - [x] Show committee size + threshold clearly per task (e.g. "3 of 3", need 2). The settled list and the latest-round card both show it
 
 ---
