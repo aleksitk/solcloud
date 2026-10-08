@@ -211,6 +211,29 @@ function bfs(): void {
 }
 
 // ---- Public ABI ----
+//
+// Shared SolCloud entry, capped at the program's MAX_INPUT_LEN / MAX_OUTPUT_LEN.
+//   alloc(size) -> pointer into the 64-byte input buffer. size must be 1..=64.
+//   run(ptr, len) -> (outputLen << 32) | outputPtr. 0 means rejected.
+// The maze input is exactly 12 bytes: u64LE seed || u32LE size.
+// The maze output is exactly 12 bytes: u32LE pathLength || u64LE pathHash.
+// solve / getPathLength / getPathHash stay so the pinned vectors can call them.
+
+const IO_CAP: u32 = 64;
+const MAZE_INPUT_LEN: u32 = 12;
+const MAZE_OUTPUT_LEN: u32 = 12;
+const inputBuf = new StaticArray<u8>(64);
+const outputBuf = new StaticArray<u8>(64);
+
+function bufferPtr(buf: StaticArray<u8>): usize {
+  return changetype<usize>(buf);
+}
+
+export function alloc(size: u32): usize {
+  if (size == 0 || size > IO_CAP) return 0;
+  return bufferPtr(inputBuf);
+}
+
 export function solve(seed: u64, size: u32): void {
   generate(size, seed);
   bfs();
@@ -222,4 +245,16 @@ export function getPathLength(): u32 {
 
 export function getPathHash(): u64 {
   return gPathHash;
+}
+
+export function run(inputPtr: usize, inputLen: u32): u64 {
+  if (inputLen != MAZE_INPUT_LEN || inputLen > IO_CAP) return 0;
+  const seed = load<u64>(inputPtr);
+  const size = load<u32>(inputPtr + 8);
+  if (size == 0 || size > 512) return 0;
+  solve(seed, size);
+  const out = bufferPtr(outputBuf);
+  store<u32>(out, gPathLength);
+  store<u64>(out + 4, gPathHash);
+  return (u64(MAZE_OUTPUT_LEN) << 32) | u64(out);
 }

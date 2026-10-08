@@ -23,7 +23,7 @@ const vectors = INPUTS.map((input) => {
 
 const payload = {
   function: "labyrinth-shortest-path",
-  abi: "solve(seed:u64,size:u32); getPathLength():u32; getPathHash():u64",
+  abi: "alloc(size:u32)->ptr; run(ptr,len)->(outputLen<<32)|outputPtr; maze input u64LE seed || u32LE size; maze output u32LE pathLength || u64LE pathHash. Helpers: solve, getPathLength, getPathHash.",
   wasmSha256,
   generatedAt: new Date().toISOString(),
   vectors,

@@ -1,7 +1,7 @@
 {
   "function": "labyrinth-shortest-path",
-  "abi": "solve(seed:u64,size:u32); getPathLength():u32; getPathHash():u64",
-  "wasmSha256": "52d0b49e663d826e92598ff7c0939b2c26804026c750d3cfa92a3dd3986686f6",
+  "abi": "alloc(size:u32)->ptr; run(ptr,len)->(outputLen<<32)|outputPtr; maze input u64LE seed || u32LE size; maze output u32LE pathLength || u64LE pathHash. Helpers: solve, getPathLength, getPathHash.",
+  "wasmSha256": "ee0b3e4c3ede257e3719c52deee27528ea791218cdea3a5802fd52bf9ce5057a",
   "generatedAt": "2026-10-07T11:46:37.159Z",
   "vectors": [
     {

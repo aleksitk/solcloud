@@ -8,7 +8,7 @@ import {
 
 export const RPC = "https://api.devnet.solana.com";
 export const PROGRAM_ID = new PublicKey("D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ");
-export const WASM_HASH = "52d0b49e663d826e92598ff7c0939b2c26804026c750d3cfa92a3dd3986686f6";
+export const WASM_HASH = "ee0b3e4c3ede257e3719c52deee27528ea791218cdea3a5802fd52bf9ce5057a";
 
 // Public owner keys of the three nodes already staked on devnet.
 const NODE_OWNERS = [

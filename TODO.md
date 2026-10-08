@@ -128,7 +128,7 @@
 
 The chain already accepts any Wasm hash. The labyrinth stays the built-in demo: the map view draws only that program. Another function is a second AssemblyScript module with one shared export. The editor is a text field and a Compile button, not a full IDE.
 
-- [ ] One ABI: `run` reads input bytes and returns output bytes, with a size cap. Integer-only, no host imports except `abort`
+- [x] One ABI: `alloc` plus `run`. Input and output are capped at 64 bytes. The maze's `run` takes the 12-byte seed and size and returns the same 12-byte path result as `solve`. All 8 vectors match. Module hash `ee0b3e4c3ede257e3719c52deee27528ea791218cdea3a5802fd52bf9ce5057a`. Rounds already on devnet keep the previous hash
 - [ ] A node runner loads a Wasm file with that export, checks the SHA-256, and runs it on a worker thread with a timeout
 - [ ] Dashboard editor: AssemblyScript source, compile with `asc`, show the hash, and use that hash on the next task
 - [ ] For the demo, the compiled file stays on the machine the nodes read. Public hosting is still the Phase 1 item (IPFS/Arweave/HTTPS)

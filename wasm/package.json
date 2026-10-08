@@ -10,7 +10,8 @@
     "hash": "node scripts/hash.mjs",
     "run": "node scripts/run.mjs",
     "gen-vectors": "node scripts/gen-vectors.mjs",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "abi": "node scripts/abi.mjs"
   },
   "devDependencies": {
     "assemblyscript": "^0.27.31"

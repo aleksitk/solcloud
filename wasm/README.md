@@ -11,7 +11,17 @@ exactly the shape of task SolCloud is built for.
 
 ## ABI
 
-Raw exports (no runtime glue; instantiate with a single `env.abort` import):
+Raw exports (no runtime glue; instantiate with a single `env.abort` import).
+Input and output are capped at 64 bytes, the same limit as the on-chain program.
+
+Any SolCloud function uses the same two exports:
+
+| Export | Signature | Description |
+| --- | --- | --- |
+| `alloc` | `(size: u32) => u32` | Pointer to a buffer for the input. `size` must be 1..=64. Returns 0 if it rejects. |
+| `run` | `(ptr: u32, len: u32) => u64` | Read `len` bytes at `ptr`. Returns `(outputLen << 32) \| outputPtr`, or 0 if it rejects. |
+
+The labyrinth still exports its original helpers. `run` accepts only the 12-byte maze input.
 
 | Export | Signature | Description |
 | --- | --- | --- |
@@ -19,8 +29,8 @@ Raw exports (no runtime glue; instantiate with a single `env.abort` import):
 | `getPathLength` | `() => u32` | Shortest-path length (steps). Read after `solve`. |
 | `getPathHash` | `() => u64` | FNV-1a hash of the ordered path cells. Read after `solve`. |
 
-Canonical result bytes (used later for commit/reveal):
-`u32LE(pathLength) ‖ u64LE(pathHash)` = 12 bytes.
+Maze input bytes: `u64LE(seed) ‖ u32LE(size)`.
+Maze output bytes: `u32LE(pathLength) ‖ u64LE(pathHash)` = 12 bytes.
 
 ## Determinism
 
