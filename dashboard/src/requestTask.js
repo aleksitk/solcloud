@@ -119,11 +119,8 @@ export function describeRound(round) {
   return `${need} of ${size} must agree.`;
 }
 
-export async function readRound(taskId) {
-  const task = taskPda(taskId);
-  const info = await readAccount(task);
-  if (!info) return null;
-  const data = Uint8Array.from(info.data);
+function parseTask(raw, taskId, task) {
+  const data = Uint8Array.from(raw);
   const view = new DataView(data.buffer);
   const inputLen = view.getUint32(72, true);
   let offset = 76 + inputLen + 8;
@@ -136,12 +133,96 @@ export async function readRound(taskId) {
     id: taskId.toString().padStart(2, "0"),
     address: task.toBase58(),
     status: ROUND_STATUS[status] || "Unknown",
-    tone: status === 3 ? "good" : status === 4 ? "bad" : status === 1 || status === 2 ? "live" : "muted",
     commits: data[offset + 1],
     reveals: data[offset + 2],
     committee,
     threshold: Math.floor(committee / 2) + 1,
   };
+}
+
+function parseResult(raw) {
+  if (!raw) return null;
+  const data = Uint8Array.from(raw);
+  const view = new DataView(data.buffer);
+  const outputLen = view.getUint32(40, true);
+  const offset = 44 + outputLen + 32;
+  const names = ["Finalized", "Failed", "Refunded"];
+  return {
+    status: names[data[offset]] || "Unknown",
+    agreed: data[offset + 1],
+    committee: data[offset + 2],
+  };
+}
+
+function settledView(task, result) {
+  const size = task.committee;
+  const agreement = `${result.agreed} of ${size}`;
+  if (result.status === "Finalized" && result.agreed < size) {
+    return { status: "Slashed", title: "Minority lost stake", agreement, effect: "Stake cut", tone: "bad" };
+  }
+  if (result.status === "Finalized") {
+    return { status: "Finalized", title: "Majority paid", agreement, effect: "Paid", tone: "good" };
+  }
+  if (result.status === "Refunded") {
+    if (task.reveals >= size && result.agreed < task.threshold) {
+      return { status: "Refunded", title: "No majority", agreement, effect: "Returned", tone: "muted" };
+    }
+    const progress = task.commits < size ? task.commits : task.reveals;
+    return {
+      status: "Refunded",
+      title: "Window expired",
+      agreement: `${progress} of ${size}`,
+      effect: "Returned",
+      tone: "muted",
+    };
+  }
+  return { status: "Failed", title: "Round failed", agreement, effect: "—", tone: "bad" };
+}
+
+export async function readRound(taskId) {
+  const task = taskPda(taskId);
+  const info = await readAccount(task);
+  if (!info) return null;
+  const parsed = parseTask(info.data, taskId, task);
+  const live = parsed.status === "Committing" || parsed.status === "Revealing";
+  return {
+    ...parsed,
+    tone: parsed.status === "Finalized" ? "good" : parsed.status === "Failed" ? "bad" : live ? "live" : "muted",
+  };
+}
+
+export async function readSettledRounds() {
+  const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
+  const configInfo = await readAccount(config);
+  if (!configInfo) throw new Error("The protocol config is missing on devnet.");
+  const count = Number(readTaskCount(configInfo.data));
+  if (!count) return [];
+
+  const ids = [];
+  for (let id = count; id >= 1; id -= 1) ids.push(BigInt(id));
+  const tasks = ids.map((id) => taskPda(id));
+  const taskInfos = await withRetries(() => connection.getMultipleAccountsInfo(tasks));
+  const rows = [];
+  const resultKeys = [];
+  for (let index = 0; index < ids.length; index += 1) {
+    if (!taskInfos[index]) continue;
+    rows.push(parseTask(taskInfos[index].data, ids[index], tasks[index]));
+    const [result] = PublicKey.findProgramAddressSync(
+      [Buffer.from("result"), tasks[index].toBuffer()],
+      PROGRAM_ID
+    );
+    resultKeys.push(result);
+  }
+  if (!rows.length) return [];
+
+  const resultInfos = await withRetries(() => connection.getMultipleAccountsInfo(resultKeys));
+  const settled = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const result = parseResult(resultInfos[index]?.data);
+    if (!result) continue;
+    settled.push({ ...rows[index], ...settledView(rows[index], result) });
+  }
+  return settled;
 }
 
 function solText(lamports) {

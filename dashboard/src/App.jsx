@@ -2,58 +2,11 @@ import { useState } from "react";
 import Aurora from "./Aurora.jsx";
 import LaunchForm from "./LaunchForm.jsx";
 import NodeList from "./NodeList.jsx";
+import RoundHistory from "./RoundHistory.jsx";
 import RoundStatus from "./RoundStatus.jsx";
 import WalletButton from "./WalletButton.jsx";
 
 const PROGRAM_ID = "D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ";
-
-const proofs = [
-  {
-    id: "05",
-    status: "Finalized",
-    tone: "good",
-    title: "Majority paid",
-    agreement: "3 of 3",
-    effect: "+0.0167 SOL",
-    address: "75Dtq2i5ZTmLigiCT97yKWxBeJToBpf1XA69FDCDf26Z",
-  },
-  {
-    id: "02",
-    status: "Finalized",
-    tone: "good",
-    title: "Majority paid",
-    agreement: "3 of 3",
-    effect: "+0.0167 SOL",
-    address: "3huCpEBJFqYaFENgiuZivtQw1oCXBzJqQCVcCtT7JEnk",
-  },
-  {
-    id: "03",
-    status: "Slashed",
-    tone: "bad",
-    title: "Minority lost stake",
-    agreement: "2 of 3",
-    effect: "−0.5000 SOL",
-    address: "JhjLVcWT73qVbV6WWgRo7w1nkYiuEji52pLFmVvE6hV",
-  },
-  {
-    id: "04",
-    status: "Refunded",
-    tone: "muted",
-    title: "No majority",
-    agreement: "1 of 3",
-    effect: "+0.0500 SOL",
-    address: "2DsvhJTuHe9qspSQaBb1QpxjuvQnZcL4oeVgSbcbry6k",
-  },
-  {
-    id: "01",
-    status: "Refunded",
-    tone: "muted",
-    title: "Window expired",
-    agreement: "0 of 3",
-    effect: "+0.0500 SOL",
-    address: "8ZUdN4nZLqRsKgH9uV88YRX8My6RsGi1hJ1v4aYAGw2a",
-  },
-];
 
 function explorerAddress(address) {
   return `https://explorer.solana.com/address/${address}?cluster=devnet`;
@@ -149,34 +102,7 @@ export default function App() {
 
       <section className="shell below">
         <RoundStatus />
-        <div className="ledger-head">
-          <h2>Settled rounds</h2>
-          <span>Devnet · {proofs.length}</span>
-        </div>
-        <div className="sheet">
-          <div className="sheet-head">
-            <span>Round</span>
-            <span>Status</span>
-            <span>Agreement</span>
-            <span>Effect</span>
-            <span />
-          </div>
-          {proofs.map((proof) => (
-            <a key={proof.id} className="sheet-row" href={explorerAddress(proof.address)} target="_blank" rel="noreferrer">
-              <span className="mono">{proof.id}</span>
-              <span className="status">
-                <b>
-                  <i className={proof.tone} />
-                  {proof.status}
-                </b>
-                <em>{proof.title}</em>
-              </span>
-              <span className="mono agree">{proof.agreement}</span>
-              <span className={`mono amount ${proof.tone}`}>{proof.effect}</span>
-              <span className="go">Explorer</span>
-            </a>
-          ))}
-        </div>
+        <RoundHistory />
         <NodeList />
       </section>
       </>

@@ -446,6 +446,7 @@ h1 {
 
 .amount.good { color: #14f195; }
 .amount.bad { color: #ff8d8d; }
+.amount.muted { color: #c4b6d4; }
 
 .go {
   color: #c4b6d4;
