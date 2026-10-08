@@ -1,4 +1,6 @@
+import { useState } from "react";
 import Aurora from "./Aurora.jsx";
+import LaunchForm from "./LaunchForm.jsx";
 import WalletButton from "./WalletButton.jsx";
 
 const PROGRAM_ID = "D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ";
@@ -61,23 +63,37 @@ function Mark() {
 }
 
 export default function App() {
+  const [view, setView] = useState("home");
+
   return (
     <div>
-      <div className="shell">
-        <header className="site-header">
-          <div className="brand">
+      <header className="site-header">
+        <div className="shell header-row">
+          <button className="brand" type="button" onClick={() => setView("home")}>
             <Mark />
             SolCloud
-          </div>
+          </button>
+          <nav className="nav">
+            <button type="button" className={view === "home" ? "on" : ""} onClick={() => setView("home")}>
+              Rounds
+            </button>
+            <button type="button" className={view === "launch" ? "on" : ""} onClick={() => setView("launch")}>
+              New task
+            </button>
+          </nav>
           <div className="header-tools">
             <a className="program-link" href={explorerAddress(PROGRAM_ID)} target="_blank" rel="noreferrer">
               Devnet {short(PROGRAM_ID)}
             </a>
             <WalletButton />
           </div>
-        </header>
-      </div>
+        </div>
+      </header>
 
+      {view === "launch" ? (
+        <LaunchForm />
+      ) : (
+      <>
       <section className="hero">
         <Aurora />
         <div className="hero-shade" />
@@ -150,6 +166,8 @@ export default function App() {
           ))}
         </div>
       </section>
+      </>
+      )}
     </div>
   );
 }
