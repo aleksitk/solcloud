@@ -22,7 +22,7 @@ function shortError(err) {
   return message.length > 280 ? `${message.slice(0, 280)}…` : message;
 }
 
-export default function LaunchForm() {
+export default function LaunchForm({ onOpenFunction }) {
   const wallet = useWallet();
   const [size, setSize] = useState(3);
   const [reward, setReward] = useState("0.05");
@@ -161,7 +161,9 @@ export default function LaunchForm() {
           </label>
         </div>
 
-        <p className="wasm">Wasm {WASM_HASH.slice(0, 12)}…{WASM_HASH.slice(-8)}</p>
+        <button type="button" className="wasm wasm-link" onClick={onOpenFunction}>
+          Labyrinth · {WASM_HASH.slice(0, 12)}…{WASM_HASH.slice(-8)}
+        </button>
 
         <button className="submit" type="submit" disabled={!valid || phase === "preparing" || phase === "signing" || phase === "sending"}>
           Review request

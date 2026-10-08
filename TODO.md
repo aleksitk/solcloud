@@ -112,7 +112,7 @@
 
 - [x] Init React + Tailwind dashboard (dark theme, devnet landing). `@solana/web3.js` is not a dependency yet; balance is read from RPC directly
 - [x] Wallet connect (Phantom/Solflare, devnet)
-- [ ] Function registration UI (wasm hash input)
+- [x] Function registration UI. Functions shows the labyrinth Wasm hash that `request_task` already stores. There is no separate register instruction, and the field is read-only because nodes only run this hash
 - [x] Task launch UI (input parameters, reward, **committee size selector 3/5/7/9/11**). The connected wallet signs `request_task` on devnet. Only N=3 can be submitted; three nodes are staked
 - [x] Live status: Requested → Committed (x/N) → Revealed (x/N) → Finalized/Failed. The home page reads the latest task from devnet and refreshes until it settles
 - [x] Node list: stake and status, read from the three devnet node accounts. Last activity is not stored on the node, so it is not shown

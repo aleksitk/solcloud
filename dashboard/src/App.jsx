@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Aurora from "./Aurora.jsx";
+import FunctionView from "./FunctionView.jsx";
 import LaunchForm from "./LaunchForm.jsx";
 import { MazeSummary, MazeView } from "./MazePath.jsx";
 import NodeList from "./NodeList.jsx";
@@ -42,6 +43,9 @@ export default function App() {
             <button type="button" className={view === "home" ? "on" : ""} onClick={() => setView("home")}>
               Rounds
             </button>
+            <button type="button" className={view === "functions" ? "on" : ""} onClick={() => setView("functions")}>
+              Functions
+            </button>
             <button type="button" className={view === "launch" ? "on" : ""} onClick={() => setView("launch")}>
               New task
             </button>
@@ -56,7 +60,9 @@ export default function App() {
       </header>
 
       {view === "launch" ? (
-        <LaunchForm />
+        <LaunchForm onOpenFunction={() => setView("functions")} />
+      ) : view === "functions" ? (
+        <FunctionView onUse={() => setView("launch")} />
       ) : view === "map" ? (
         <MazeView onClose={() => setView("home")} />
       ) : (
