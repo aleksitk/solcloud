@@ -75,14 +75,50 @@ export function mazeInput(seed, size) {
   return concat([u64(seed), u32(size)]);
 }
 
+const reads = new Map();
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function rateLimited(err) {
+  const message = String(err?.message || err);
+  return message.includes("429") || /too many requests/i.test(message);
+}
+
+export function devnetNote(err) {
+  if (rateLimited(err)) return "Devnet is busy. It will try again shortly.";
+  return err?.message || "Devnet is not responding.";
+}
+
+let lane = Promise.resolve();
+
+function enqueue(action) {
+  const run = lane.then(action, action);
+  lane = run.then(() => wait(150), () => wait(150));
+  return run;
+}
+
+function remember(key, ttl, action) {
+  const hit = reads.get(key);
+  if (hit && Date.now() - hit.at < ttl) return hit.promise;
+  const promise = action().catch((err) => {
+    reads.delete(key);
+    throw err;
+  });
+  reads.set(key, { at: Date.now(), promise });
+  return promise;
+}
+
 async function withRetries(action) {
   let lastError = null;
-  for (let attempt = 1; attempt <= 5; attempt++) {
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
     try {
-      return await action();
+      return await enqueue(action);
     } catch (err) {
       lastError = err;
-      if (attempt < 5) await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (attempt === 4) break;
+      await wait(rateLimited(err) ? 2000 * attempt : 600);
     }
   }
   throw lastError;
@@ -100,16 +136,7 @@ function taskPda(taskId) {
 }
 
 async function readAccount(pubkey) {
-  let lastError = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      return await connection.getAccountInfo(pubkey);
-    } catch (err) {
-      lastError = err;
-      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 800));
-    }
-  }
-  throw lastError;
+  return remember(`account:${pubkey.toBase58()}`, 8000, () => withRetries(() => connection.getAccountInfo(pubkey)));
 }
 
 export function describeRound(round) {
@@ -275,7 +302,11 @@ export async function readRound(taskId) {
   };
 }
 
-export async function readSettledRounds() {
+export function readSettledRounds() {
+  return remember("settled", 15000, loadSettledRounds);
+}
+
+async function loadSettledRounds() {
   const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
   const configInfo = await readAccount(config);
   if (!configInfo) throw new Error("The protocol config is missing on devnet.");
@@ -565,14 +596,20 @@ export async function findNode(owner) {
 
 // Nodes created before tasks_slashed are 66 bytes. Finalize grows them to 74.
 async function nodeAccounts() {
-  const [current, grown] = await Promise.all([
-    withRetries(() => connection.getProgramAccounts(PROGRAM_ID, { filters: [{ dataSize: 66 }] })),
-    withRetries(() => connection.getProgramAccounts(PROGRAM_ID, { filters: [{ dataSize: 74 }] })),
-  ]);
+  const current = await withRetries(() =>
+    connection.getProgramAccounts(PROGRAM_ID, { filters: [{ dataSize: 66 }] })
+  );
+  const grown = await withRetries(() =>
+    connection.getProgramAccounts(PROGRAM_ID, { filters: [{ dataSize: 74 }] })
+  );
   return [...current, ...grown];
 }
 
-export async function readNodes() {
+export function readNodes() {
+  return remember("nodes", 15000, loadNodes);
+}
+
+async function loadNodes() {
   const accounts = await nodeAccounts();
   const known = new Map(NODE_OWNERS.map((owner, index) => [owner, index]));
   const nodes = accounts.map(({ pubkey, account }) => {
@@ -626,7 +663,11 @@ export async function buildRegisterNode({ owner, stakeLamports }) {
   return { tx, node, blockhash, lastValidBlockHeight };
 }
 
-export async function latestRound() {
+export function latestRound() {
+  return remember("latest", 8000, loadLatestRound);
+}
+
+async function loadLatestRound() {
   const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
   const info = await readAccount(config);
   if (!info) throw new Error("The protocol config is missing on devnet.");
@@ -741,7 +782,7 @@ export async function currentSlot() {
 
 export async function nextTaskId() {
   const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
-  const info = await withRetries(() => connection.getAccountInfo(config));
+  const info = await readAccount(config);
   if (!info) throw new Error("The protocol config is missing on devnet.");
 
   let id = readTaskCount(info.data) + 1n;

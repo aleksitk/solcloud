@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { readNodes } from "./requestTask.js";
+import { devnetNote, readNodes } from "./requestTask.js";
 
 function explorerAddress(address) {
   return `https://explorer.solana.com/address/${address}?cluster=devnet`;
@@ -22,7 +22,7 @@ export default function NodeList() {
         setNodes(next);
         setNote(next.length ? "" : "No nodes are staked on devnet.");
       } catch (err) {
-        if (!stop) setNote(err?.message || "Devnet is not responding.");
+        if (!stop) setNote(devnetNote(err));
       } finally {
         running = false;
       }

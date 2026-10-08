@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { readNodeBrowser } from "./requestTask.js";
+import { devnetNote, readNodeBrowser } from "./requestTask.js";
 
 const COLUMNS = [
   { key: "node", label: "Node" },
@@ -50,7 +50,7 @@ export default function NodeBrowser() {
         setNote(next.length ? "" : "No active nodes are staked on devnet.");
       })
       .catch((err) => {
-        if (!stop) setNote(err?.message || "Devnet is not responding.");
+        if (!stop) setNote(devnetNote(err));
       });
     return () => {
       stop = true;

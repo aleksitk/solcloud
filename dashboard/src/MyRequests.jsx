@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { readMyRequests } from "./requestTask.js";
+import { devnetNote, readMyRequests } from "./requestTask.js";
 
 function explorerAddress(address) {
   return `https://explorer.solana.com/address/${address}?cluster=devnet`;
@@ -32,7 +32,7 @@ export default function MyRequests({ owner, refreshKey }) {
         setRows(next);
         setNote(next.length ? "" : "This wallet has no tasks yet.");
       } catch (err) {
-        if (!stop) setNote(err?.message || "Devnet is not responding.");
+        if (!stop) setNote(devnetNote(err));
       }
     }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { readSettledRounds } from "./requestTask.js";
+import { devnetNote, readSettledRounds } from "./requestTask.js";
 
 function explorerAddress(address) {
   return `https://explorer.solana.com/address/${address}?cluster=devnet`;
@@ -22,7 +22,7 @@ export default function RoundHistory() {
         setRounds(next);
         setNote(next.length ? "" : "No round has settled yet.");
       } catch (err) {
-        if (!stop) setNote(err?.message || "Devnet is not responding.");
+        if (!stop) setNote(devnetNote(err));
       } finally {
         running = false;
       }

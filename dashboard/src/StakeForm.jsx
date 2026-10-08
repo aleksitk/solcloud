@@ -3,6 +3,7 @@ import {
   averageCompletion,
   buildRegisterNode,
   explorerTx,
+  devnetNote,
   findNode,
   readMinStake,
   readNodeHistory,
@@ -91,7 +92,7 @@ export default function StakeForm() {
       .catch((err) => {
         if (!live) return;
         setRounds(null);
-        setRoundsNote(err?.message || "Devnet is not responding.");
+        setRoundsNote(devnetNote(err));
       });
     return () => {
       live = false;

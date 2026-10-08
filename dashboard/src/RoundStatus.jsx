@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { describeRound, latestRound, readRound } from "./requestTask.js";
+import { describeRound, devnetNote, latestRound, readRound } from "./requestTask.js";
 
 const SETTLED = new Set(["Finalized", "Failed", "Refunded"]);
 
@@ -26,14 +26,14 @@ export default function RoundStatus({ taskId, label = "Latest round", compact = 
         setNote(next ? "" : "No round has been opened yet.");
         if (next && SETTLED.has(next.status)) clearInterval(timer);
       } catch (err) {
-        if (!stop) setNote(err?.message || "Devnet is not responding.");
+        if (!stop) setNote(devnetNote(err));
       } finally {
         running = false;
       }
     }
 
     load();
-    timer = setInterval(load, 8000);
+    timer = setInterval(load, 20000);
     return () => {
       stop = true;
       clearInterval(timer);
