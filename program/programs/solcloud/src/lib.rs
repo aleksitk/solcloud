@@ -407,6 +407,13 @@ pub mod solcloud {
             for pair in 0..committee_size as usize {
                 let commit = read_commit(&ctx.remaining_accounts[pair * 3])?;
                 if commit.output_hash == best_hash {
+                    let node_info = &ctx.remaining_accounts[pair * 3 + 2];
+                    let (pda, _) = Pubkey::find_program_address(
+                        &[NODE_SEED, commit.node.as_ref()],
+                        ctx.program_id,
+                    );
+                    require!(pda == node_info.key(), SolCloudError::InvalidCommitteeNode);
+                    note_task_completed(node_info)?;
                     move_lamports(
                         &ctx.accounts.task.to_account_info(),
                         &ctx.remaining_accounts[pair * 3 + 1],
@@ -507,6 +514,17 @@ fn read_node(acc: &AccountInfo) -> Result<NodeAccount> {
     let mut slice: &[u8] = &data;
     NodeAccount::try_deserialize(&mut slice)
         .map_err(|_| error!(SolCloudError::InvalidCommitteeNode))
+}
+
+fn note_task_completed(acc: &AccountInfo) -> Result<()> {
+    let mut node = read_node(acc)?;
+    node.tasks_completed = node
+        .tasks_completed
+        .checked_add(1)
+        .ok_or(SolCloudError::Overflow)?;
+    let mut data = acc.try_borrow_mut_data()?;
+    node.try_serialize(&mut &mut data[..])?;
+    Ok(())
 }
 
 fn reduce_stake(acc: &AccountInfo, slash_bps: u16) -> Result<u64> {
