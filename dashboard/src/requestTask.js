@@ -298,6 +298,7 @@ export async function readNodes() {
     const owner = new PublicKey(data.subarray(8, 40)).toBase58();
     const stake = data.readBigUInt64LE(40);
     const status = data[48];
+    const reputation = data.readBigInt64LE(49);
     const order = known.get(owner);
     return {
       id: order === undefined ? shortOwner(owner) : String(order + 1).padStart(2, "0"),
@@ -305,6 +306,7 @@ export async function readNodes() {
       order: order === undefined ? 1000 : order,
       address: pubkey.toBase58(),
       status: NODE_STATUS[status] || "Unknown",
+      reputation,
       tone: status === 2 ? "bad" : status === 0 ? "good" : "muted",
       stakeText: solText(stake),
       reduced: stake < 1_000_000_000n,
@@ -349,6 +351,55 @@ export async function latestRound() {
 
 export function activeNodes(nodes) {
   return nodes.filter((node) => node.status === "Active");
+}
+
+function mulberry32(seed) {
+  let state = seed >>> 0;
+  return function next() {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffle(items, next) {
+  const copy = items.slice();
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(next() * (index + 1));
+    [copy[index], copy[swap]] = [copy[swap], copy[index]];
+  }
+  return copy;
+}
+
+// Active nodes, highest reputation first. Equal scores are shuffled with the seed.
+export function pickCommittee(nodes, size, seed) {
+  const buckets = new Map();
+  for (const node of activeNodes(nodes)) {
+    const key = (node.reputation ?? 0n).toString();
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(node);
+    else buckets.set(key, [node]);
+  }
+  const ranks = [...buckets.keys()].sort((left, right) => {
+    const a = BigInt(left);
+    const b = BigInt(right);
+    if (a === b) return 0;
+    return a > b ? -1 : 1;
+  });
+  const next = mulberry32(seed);
+  const picked = [];
+  for (const rank of ranks) {
+    picked.push(...shuffle(buckets.get(rank), next));
+  }
+  return picked.slice(0, size);
+}
+
+export async function committeeSeed() {
+  const { blockhash } = await withRetries(() => connection.getLatestBlockhash("confirmed"));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(blockhash));
+  return new Uint32Array(digest)[0];
 }
 
 export async function nextTaskId() {

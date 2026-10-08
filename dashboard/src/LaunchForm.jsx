@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import {
   activeNodes,
   buildRequestTask,
+  committeeSeed,
   explorerTx,
+  pickCommittee,
   nextTaskId,
   readNodes,
   sendSigned,
@@ -78,9 +80,10 @@ export default function LaunchForm({ onOpenFunction }) {
     setError("");
     setPhase("reading");
     try {
-      const nodes = activeNodes(await readNodes());
-      const picked = nodes.slice(0, size);
-      setActiveCount(nodes.length);
+      const nodes = await readNodes();
+      const active = activeNodes(nodes);
+      const picked = pickCommittee(active, size, await committeeSeed());
+      setActiveCount(active.length);
       if (picked.length < size) {
         setReview(null);
         setError(`Only ${picked.length} active nodes. Choose a smaller committee.`);
@@ -164,7 +167,7 @@ export default function LaunchForm({ onOpenFunction }) {
             ))}
           </div>
           <p className="hint">
-            {threshold} of {size} must agree.
+            {threshold} of {size} must agree. Active nodes, highest reputation first. A tie follows the latest block hash.
             {activeCount === null
               ? " Reading staked nodes…"
               : needsMoreNodes

@@ -65,7 +65,7 @@
 - [x] `request_task(wasm_hash, input, reward, committee_size)` — dApp creates task, reward escrowed
   - [x] Validate `committee_size` is odd and within [3, 11]
   - [x] Require enough registered/available nodes for the chosen `N`
-- [ ] Committee selection: pick `N` nodes via slot hash + task ID seed (demo passes an explicit node list)
+- [x] Committee selection: the dashboard reads the nodes that are active at request time, ranks them by reputation, and breaks a tie with the latest block hash. The program still receives that list and checks each node. Reputation stays 0 until a round updates it
 - [x] `commit_result(task_id, hash_commitment)` — node submits commit
 - [x] `reveal_result(task_id, result, nonce)` — node reveals answer
 - [x] Finalize logic: **M-of-N majority** check (`threshold = N/2 + 1`), create `TaskResult`
@@ -113,7 +113,7 @@
 - [x] Init React + Tailwind dashboard (dark theme, devnet landing). `@solana/web3.js` is not a dependency yet; balance is read from RPC directly
 - [x] Wallet connect (Phantom/Solflare, devnet)
 - [x] Function registration UI. Functions shows the labyrinth Wasm hash that `request_task` already stores. There is no separate register instruction. User-written AssemblyScript is the next section
-- [x] Task launch UI (input parameters, reward, **committee size selector 3/5/7/9/11**). The connected wallet signs `request_task` on devnet. The committee is the first N active nodes in the registry. A size larger than the active count stays disabled
+- [x] Task launch UI (input parameters, reward, **committee size selector 3/5/7/9/11**). The connected wallet signs `request_task` on devnet. The committee is the active nodes at request time, highest reputation first, with ties broken by the latest block hash. A size larger than the active count stays disabled
 - [x] Live status: Requested → Committed (x/N) → Revealed (x/N) → Finalized/Failed. The home page reads the latest task from devnet and refreshes until it settles
 - [x] Node list: stake and status, read from every node account on devnet. A connected wallet can stake and register with `register_node`. Last activity is not stored on the node, so it is not shown
 - [x] Slashing visual on the hero round (node 3 pulses). Settled rounds, including the slash and the refunds, are read from devnet
