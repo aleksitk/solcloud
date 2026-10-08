@@ -529,9 +529,20 @@ h1 {
   margin: 0;
 }
 
+.review > * + * {
+  margin-top: 14px;
+}
+
 .review p + p {
-  margin-top: 8px;
   color: #c4b6d4;
+}
+
+.review a {
+  color: #fff;
+}
+
+.review .form-error {
+  color: #ff8d8d;
 }
 
 @media (max-width: 800px) {

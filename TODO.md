@@ -113,7 +113,7 @@
 - [x] Init React + Tailwind dashboard (dark theme, devnet landing). `@solana/web3.js` is not a dependency yet; balance is read from RPC directly
 - [x] Wallet connect (Phantom/Solflare, devnet)
 - [ ] Function registration UI (wasm hash input)
-- [ ] Task launch UI (input parameters, reward, **committee size selector 3/5/7/9/11**)
+- [x] Task launch UI (input parameters, reward, **committee size selector 3/5/7/9/11**). The connected wallet signs `request_task` on devnet. Only N=3 can be submitted; three nodes are staked
 - [ ] Live status: Requested → Committed (x/N) → Revealed (x/N) → Finalized/Failed
 - [ ] Node list: stake, status, last activity
 - [x] Slashing visual on the hero round (node 3 pulses). A full history indicator is still open

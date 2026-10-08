@@ -1,60 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-
-const RPC = "https://api.devnet.solana.com";
-
-function walletChoices() {
-  const phantom = window.phantom?.solana;
-  const solflare = window.solflare;
-  return [
-    {
-      id: "phantom",
-      name: "Phantom",
-      provider: phantom?.isPhantom ? phantom : null,
-      install: "https://phantom.com/download",
-    },
-    {
-      id: "solflare",
-      name: "Solflare",
-      provider: solflare?.isSolflare ? solflare : null,
-      install: "https://solflare.com/download",
-    },
-  ];
-}
+import { useWallet, walletChoices } from "./wallet.jsx";
 
 function short(value) {
   return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }
 
-async function devnetBalance(address) {
-  let lastError = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const response = await fetch(RPC, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getBalance",
-          params: [address],
-        }),
-      });
-      const body = await response.json();
-      if (body.error) throw new Error(body.error.message);
-      return body.result.value / 1_000_000_000;
-    } catch (err) {
-      lastError = err;
-    }
-  }
-  throw lastError;
-}
-
 export default function WalletButton() {
+  const { address, balance, note, setNote, connect, disconnect } = useWallet();
   const [open, setOpen] = useState(false);
-  const [address, setAddress] = useState(null);
-  const [balance, setBalance] = useState(null);
-  const [note, setNote] = useState("");
-  const providerRef = useRef(null);
   const rootRef = useRef(null);
 
   useEffect(() => {
@@ -65,39 +18,14 @@ export default function WalletButton() {
     return () => document.removeEventListener("pointerdown", onPointer);
   }, []);
 
-  async function loadBalance(next) {
-    setBalance(null);
-    try {
-      setBalance(await devnetBalance(next));
-    } catch {
-      setNote("Devnet balance is unavailable.");
-    }
-  }
-
-  async function connect(wallet) {
+  async function onConnect(wallet) {
     setNote("");
     try {
-      const response = await wallet.provider.connect();
-      const key = wallet.provider.publicKey?.toString() || response.publicKey.toString();
-      providerRef.current = wallet.provider;
-      setAddress(key);
+      await connect(wallet);
       setOpen(false);
-      loadBalance(key);
     } catch (err) {
       setNote(err?.message || "Connection was rejected.");
     }
-  }
-
-  async function disconnect() {
-    try {
-      await providerRef.current?.disconnect();
-    } catch {
-      // The wallet may already be closed.
-    }
-    providerRef.current = null;
-    setAddress(null);
-    setBalance(null);
-    setNote("");
   }
 
   if (address) {
@@ -133,7 +61,7 @@ export default function WalletButton() {
                 key={wallet.id}
                 type="button"
                 className="block w-full px-3 py-2 text-left font-mono text-xs hover:bg-[#1a1c16]"
-                onClick={() => connect(wallet)}
+                onClick={() => onConnect(wallet)}
               >
                 {wallet.name}
               </button>

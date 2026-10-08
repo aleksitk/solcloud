@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "buffer": "^6.0.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
