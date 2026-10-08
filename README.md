@@ -1,108 +1,105 @@
 # SolCloud
 
-> **Verifiable Off-Chain Compute for Solana Programs** — cryptoeconomic trust, commodity hardware.
+Verifiable off-chain compute for Solana. Staked nodes run the same deterministic Wasm program, commit a hash, then reveal the output. The chain pays the majority and cuts the stake of a mismatch.
 
-SolCloud lets Solana programs offload heavy deterministic computation to a network of independent
-nodes and verify the result on-chain via **2-of-3 consensus, staking, and slashing**.
+The program is on devnet: [`D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ`](https://explorer.solana.com/address/D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ?cluster=devnet).
 
----
+## Problem
 
-## 📌 Status
+A Solana transaction has a hard compute budget. Pathfinding, matching, and similar deterministic work do not fit inside it. Teams then run that work on one server. Users cannot check the answer, and that server is a single point of failure.
 
-🚧 Active development — Colosseum Hackathon (submission: Oct 10, 2026).
+Zero-knowledge coprocessors prove the result, at the cost of a slow and expensive proof. Trusted hardware asks you to trust the chip vendor.
 
-## 🧩 Problem
+## Solution
 
-A Solana program has a strict Compute Unit budget per transaction (~1.4M CU today). Many useful
-deterministic tasks — pathfinding, order matching, risk/liquidation calculations, simulations —
-don't fit within that limit. Today developers run these on their own centralized server, which means:
+The requester chooses an odd committee of 3, 5, 7, 9, or 11 nodes and locks a reward. Every selected node runs the same Wasm on the same input. They first post `sha256(output ‖ nonce)`, then reveal the output. Agreement is a majority: `floor(N / 2) + 1`. The majority is paid from the escrow. A node that reveals a different output loses part of its stake. If there is no majority, or the window expires before the committee finishes, the reward returns to the requester.
 
-- **Users must trust a single server** and can't verify the result wasn't forged.
-- **A single point of failure** can take the whole app down.
+The function has to be deterministic integer Wasm. It exports `alloc` and `run`. Input and output are at most 64 bytes. The built-in demo is a labyrinth: a seed and a size go in, a path length and a path hash come out.
 
-Existing alternatives have trade-offs: ZK coprocessors are mathematically strong but proving is
-expensive and relatively slow; TEE-based oracle compute requires trusting the hardware and its vendor.
-
-## 💡 Solution
-
-Three independent nodes run the exact same computation. If two agree on the same answer, it's
-accepted; a node that returns a different answer loses part of its stake.
-
-## 🏗️ Architecture
+## Architecture
 
 ```
-dApp Program ──(1) request_task──► SolCloud Program (Anchor) ◄── Node Registry (staked)
-                                        │ (2) committee: 3 nodes
-        ┌───────────────────────────────┼───────────────────────────────┐
-        ▼                               ▼                               ▼
-  Raspberry Pi #1                 Raspberry Pi #2                 Raspberry Pi #3
-        └──────── (3) commit(hash) → reveal(result) ─────────────────────┘
-                                        ▼
-                            2-of-3? → (4a) TaskResult + reward | (4b) slashing
-                                        ▼
-                        (5) dApp reads the verified result
+Wallet ── request_task ──► SolCloud program (devnet)
+                               │  escrow on the task account
+                               │  committee = N active node accounts
+        ┌──────────────────────┼──────────────────────┐
+        ▼                      ▼                      ▼
+     Node 1                 Node 2                 Node N
+        └──── commit(hash) ──► reveal(output, nonce) ─┘
+                               ▼
+                    finalize: majority paid, mismatch slashed
+                               ▼
+                    TaskResult account, read by the dashboard
 ```
 
-1. **Request & escrow** — a dApp calls `request_task(wasm_hash, input, max_reward)` via CPI; the
-   reward is locked in escrow. Input travels in the transaction, so it's small (~1232-byte tx limit).
-2. **Committee selection** — the program picks 3 staked nodes using a seed derived from a recent
-   slot hash and the task ID.
-3. **Execution** — each node verifies the Wasm hash and runs the function in an isolated sandbox.
-4. **Commit → reveal** — nodes first submit `hash(result ‖ nonce)`, then reveal the result and nonce.
-5. **Finalize & slashing** — if two reveals match, the result is stored in a `TaskResult` account and
-   the reward is distributed; a mismatching node is slashed.
-6. **Consume** — the dApp reads the finalized `TaskResult` and verifies status is `Finalized`.
+1. **Register.** A wallet stakes at least 1 SOL into a node account. The stake stays there.
+2. **Request.** The dashboard reads the nodes that are active at that moment, ranks them by reputation, and breaks a tie with the latest block hash. The wallet signs `request_task` and names that committee. The reward moves into the task account.
+3. **Run.** A node checks the Wasm SHA-256, then runs `alloc` and `run` on a worker thread with a timeout. The host import is only `env.abort`.
+4. **Commit, then reveal.** The output stays hidden until every committee node has committed. The reveal must match the commit.
+5. **Settle.** `finalize` pays the majority and slashes a mismatch (the live config takes 50% of that node's recorded stake). A timeout with a missing commit or reveal refunds the requester and does not slash.
 
-## 📦 Repository layout
+Reputation is stored on the node account. The program does not change it after a round yet, so equal scores are ordered by the block hash.
+
+The dashboard signs the request and the stake, and it reads accounts. Commit, reveal, and finalize for the live rounds are sent by the scripts in `program/scripts/` from the operator machine. The worker runner does not listen for tasks yet.
+
+## Repository
 
 ```
 solcloud/
-├── program/        # Anchor program (Rust) — registry, task, commit/reveal, finalize, slashing
-├── worker/         # Worker node (TypeScript) — listener, Wasm runner, commit/reveal
-├── wasm/           # Demo function (labyrinth shortest-path) → .wasm
-├── consumer/       # Consumer dApp (small Anchor program)
-├── dashboard/      # React + Tailwind + @solana/web3.js UI
-└── docs/           # Architecture, diagrams
+├── program/     Anchor program and the devnet scripts
+├── wasm/        Labyrinth module, alloc/run ABI, test vectors
+├── worker/      Hash check and timed Wasm run
+├── dashboard/   The site: rounds, functions, new task, stake
+└── docs/        Toolchain notes
 ```
 
-## 🚀 Setup
+## Run the site
 
-> TODO: expand as development progresses.
+From `dashboard/`:
 
-### Prerequisites
-- Node.js (LTS)
-- Rust + Cargo
-- Solana CLI + Anchor
-- 3× Raspberry Pi (64-bit OS) for the worker nodes
+```bash
+npm install
+npm run dev
+```
 
-## 🎯 MVP scope
+Open http://localhost:5173/. Use a Devnet wallet. The site can register a node and escrow a task. It does not commit or reveal for the nodes.
 
-- **Solana program (Anchor):** node registry & staking, `request_task` + escrow, committee
-  selection, commit/reveal, 2-of-3 finalize, slashing, timeout/refund, `TaskResult`.
-- **Worker node (TypeScript):** task listener, Wasm hash verification, sandboxed execution in a
-  worker thread with timeout and memory limits, commit/reveal. Includes a "faulty" flag for the demo.
-- **Demo function (Wasm):** shortest path through a procedurally generated 512×512 labyrinth
-  (deterministic; input is just a seed + size, output is path length + path hash).
-- **Consumer dApp (small Anchor program):** reads a `TaskResult` and updates its own state based on it.
-- **Dashboard (React + Tailwind + @solana/web3.js):** function registration, task launch, live
-  committee status, node stakes, slashing animation, and transaction links.
+## Check the Wasm
 
-## 🔐 Security & economics
+From `wasm/`:
 
-Security relies on an **honest majority plus stake**. Each node must stake to join, which makes
-Sybil identities costly. Stake must exceed the value a node secures (`stake ≥ k · V_max`). The Wasm
-function runs with **empty imports** (no time, network, files, or randomness) and strict resource
-limits (execution timeout, memory cap, output-size cap). See `docs/` for details.
+```bash
+npm install
+npm run verify
+npm run abi
+```
 
-## 🧭 Honest limitations
+`verify` checks the pinned labyrinth vectors. `abi` checks `alloc` and `run`. The current labyrinth module hash is `ee0b3e4c3ede257e3719c52deee27528ea791218cdea3a5802fd52bf9ce5057a`.
 
-- Works only for **deterministic** functions.
-- **3× compute overhead** due to redundancy.
-- **Small input/output** in the MVP (transaction-size bound).
-- Security depends on an **honest majority and stake**; it strengthens as the network grows.
-- Latency is **a few seconds** (request, commit, reveal, finalize) — not sub-millisecond.
-- **No private input** supported in the MVP.
+From `worker/`:
 
-## 📄 License
+```bash
+npm run check
+```
 
-TBD
+That runs the maze vector, rejects a file whose hash does not match, and stops a run that exceeds the timeout.
+
+## Settle a round
+
+These scripts run from `program/` with the devnet keypairs on the operator machine. Pass the task id:
+
+```bash
+node scripts/commit-result.cjs <task-id>
+node scripts/reveal-result.cjs <task-id>
+node scripts/finalize.cjs <task-id>
+```
+
+`commit-faulty.cjs` and `reveal-faulty.cjs` are the mismatch used to show a slash. `refund-expired.cjs` returns a reward after a missed window.
+
+## Limits
+
+- The function must be deterministic. Floats, time, and randomness are out.
+- Input and output are capped at 64 bytes.
+- The committee is explicit. The chain checks that each account is an active node. It does not shuffle the list itself.
+- A new node joins the registry from the site. It is called when the ranking selects it.
+- Security is an honest majority plus stake, not a cryptographic proof.

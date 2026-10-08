@@ -140,8 +140,8 @@ The chain already accepts any Wasm hash. The labyrinth stays the built-in demo: 
 
 **⚠️ Hard line — all materials must be ready by Oct 10.**
 
-- [ ] README.md: problem, solution, architecture, setup instructions
-- [ ] Architecture diagram in README
+- [x] README.md: problem, solution, architecture, setup instructions
+- [x] Architecture diagram in README
 - [ ] Final code cleanup, comments
 - [ ] Pitch deck (slides) — 8–10 slides
 - [ ] Live demo link (dashboard deployed on devnet, if hosted)
