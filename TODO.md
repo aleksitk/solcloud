@@ -113,7 +113,7 @@
 - [x] Init React + Tailwind dashboard (dark theme, devnet landing). `@solana/web3.js` is not a dependency yet; balance is read from RPC directly
 - [x] Wallet connect (Phantom/Solflare, devnet)
 - [x] Function registration UI. Functions shows the labyrinth Wasm hash that `request_task` already stores. There is no separate register instruction. User-written AssemblyScript is the next section
-- [x] Task launch UI (input parameters, reward, **committee size selector 3/5/7/9/11**). The connected wallet signs `request_task` on devnet. Only N=3 can be submitted; three nodes are staked
+- [x] Task launch UI (input parameters, reward, **committee size selector 3/5/7/9/11**). The connected wallet signs `request_task` on devnet. The committee is the first N active nodes in the registry. A size larger than the active count stays disabled
 - [x] Live status: Requested → Committed (x/N) → Revealed (x/N) → Finalized/Failed. The home page reads the latest task from devnet and refreshes until it settles
 - [x] Node list: stake and status, read from every node account on devnet. A connected wallet can stake and register with `register_node`. Last activity is not stored on the node, so it is not shown
 - [x] Slashing visual on the hero round (node 3 pulses). Settled rounds, including the slash and the refunds, are read from devnet

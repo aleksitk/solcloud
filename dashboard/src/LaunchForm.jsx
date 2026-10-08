@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  activeNodes,
   buildRequestTask,
   explorerTx,
   nextTaskId,
+  readNodes,
   sendSigned,
   solToLamports,
 } from "./requestTask.js";
@@ -11,7 +13,6 @@ import { useFunctionChoice } from "./functionChoice.jsx";
 import { useWallet } from "./wallet.jsx";
 
 const SIZES = [3, 5, 7, 9, 11];
-const STAKED_NODES = 3;
 
 function thresholdOf(size) {
   return Math.floor(size / 2) + 1;
@@ -33,18 +34,34 @@ export default function LaunchForm({ onOpenFunction }) {
   const [phase, setPhase] = useState("idle");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [activeCount, setActiveCount] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    readNodes()
+      .then((nodes) => {
+        if (!cancelled) setActiveCount(activeNodes(nodes).length);
+      })
+      .catch(() => {
+        if (!cancelled) setActiveCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const threshold = thresholdOf(size);
   const rewardNum = Number(reward);
   const seedNum = Number(seed);
   const mazeNum = Number(maze);
-  const needsMoreNodes = size > STAKED_NODES;
+  const needsMoreNodes = activeCount !== null && size > activeCount;
   const valid =
     rewardNum > 0 &&
     Number.isInteger(seedNum) &&
     seedNum >= 0 &&
     Number.isInteger(mazeNum) &&
     mazeNum > 0 &&
+    activeCount !== null &&
     !needsMoreNodes;
 
   function clearReview() {
@@ -54,13 +71,36 @@ export default function LaunchForm({ onOpenFunction }) {
     setError("");
   }
 
-  function onSubmit(event) {
+  async function onSubmit(event) {
     event.preventDefault();
-    if (!valid || phase === "signing") return;
+    if (!valid || phase === "reading" || phase === "signing") return;
     setResult(null);
     setError("");
-    setPhase("idle");
-    setReview({ size, threshold, reward: rewardNum, seed: seedNum, maze: mazeNum });
+    setPhase("reading");
+    try {
+      const nodes = activeNodes(await readNodes());
+      const picked = nodes.slice(0, size);
+      setActiveCount(nodes.length);
+      if (picked.length < size) {
+        setReview(null);
+        setError(`Only ${picked.length} active nodes. Choose a smaller committee.`);
+        setPhase("idle");
+        return;
+      }
+      setReview({
+        size,
+        threshold,
+        reward: rewardNum,
+        seed: seedNum,
+        maze: mazeNum,
+        nodes: picked.map((node) => ({ id: node.id, owner: node.owner })),
+      });
+      setPhase("idle");
+    } catch (err) {
+      setReview(null);
+      setError(shortError(err));
+      setPhase("error");
+    }
   }
 
   async function sign() {
@@ -76,6 +116,8 @@ export default function LaunchForm({ onOpenFunction }) {
         seed: review.seed,
         mazeSize: review.maze,
         wasmHash: choice.hash,
+        committeeSize: review.size,
+        owners: review.nodes.map((node) => node.owner),
       });
       setPhase("signing");
       const signed = await wallet.signTransaction(built.tx);
@@ -123,7 +165,11 @@ export default function LaunchForm({ onOpenFunction }) {
           </div>
           <p className="hint">
             {threshold} of {size} must agree.
-            {needsMoreNodes ? " Only 3 nodes are staked on devnet." : ""}
+            {activeCount === null
+              ? " Reading staked nodes…"
+              : needsMoreNodes
+                ? ` Only ${activeCount} ${activeCount === 1 ? "node is" : "nodes are"} active on devnet.`
+                : ""}
           </p>
         </fieldset>
 
@@ -167,10 +213,12 @@ export default function LaunchForm({ onOpenFunction }) {
           {choice.name} · {choice.hash.slice(0, 12)}…{choice.hash.slice(-8)}
         </button>
 
-        <button className="submit" type="submit" disabled={!valid || phase === "preparing" || phase === "signing" || phase === "sending"}>
-          Review request
+        <button className="submit" type="submit" disabled={!valid || phase === "reading" || phase === "preparing" || phase === "signing" || phase === "sending"}>
+          {phase === "reading" ? "Reading nodes…" : "Review request"}
         </button>
       </form>
+
+      {error && !review && <p className="form-error">{error}</p>}
 
       {review && (
         <div className="review">
@@ -178,8 +226,9 @@ export default function LaunchForm({ onOpenFunction }) {
             Escrow <b>{review.reward} SOL</b>. Maze seed {review.seed}, size {review.maze}.
           </p>
           <p>
-            Majority is <b>{review.threshold} of {review.size}</b>. The wallet signs this on Devnet.
+            Majority is <b>{review.threshold} of {review.size}</b>. Nodes {review.nodes.map((node) => node.id).join(", ")}.
           </p>
+          <p>The wallet signs this on Devnet.</p>
           {wallet.address ? (
             <button
               className="submit"

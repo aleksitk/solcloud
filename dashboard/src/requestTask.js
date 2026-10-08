@@ -347,14 +347,8 @@ export async function latestRound() {
   return readRound(id);
 }
 
-export function committeeNodes() {
-  return NODE_OWNERS.map(
-    (owner) =>
-      PublicKey.findProgramAddressSync(
-        [Buffer.from("node"), new PublicKey(owner).toBuffer()],
-        PROGRAM_ID
-      )[0]
-  );
+export function activeNodes(nodes) {
+  return nodes.filter((node) => node.status === "Active");
 }
 
 export async function nextTaskId() {
@@ -375,7 +369,19 @@ export async function nextTaskId() {
   throw new Error("Could not find a free task id.");
 }
 
-export async function buildRequestTask({ requester, taskId, rewardLamports, seed, mazeSize, wasmHash = WASM_HASH }) {
+export async function buildRequestTask({
+  requester,
+  taskId,
+  rewardLamports,
+  seed,
+  mazeSize,
+  wasmHash = WASM_HASH,
+  committeeSize,
+  owners,
+}) {
+  if (!Number.isInteger(committeeSize) || !Array.isArray(owners) || owners.length !== committeeSize) {
+    throw new Error("The committee does not match the chosen size.");
+  }
   const input = mazeInput(seed, mazeSize);
   const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
   const [task] = PublicKey.findProgramAddressSync(
@@ -390,7 +396,7 @@ export async function buildRequestTask({ requester, taskId, rewardLamports, seed
     u32(input.length),
     input,
     u64(rewardLamports),
-    Buffer.from([3]),
+    Buffer.from([committeeSize]),
   ]);
 
   const ix = new TransactionInstruction({
@@ -400,8 +406,8 @@ export async function buildRequestTask({ requester, taskId, rewardLamports, seed
       { pubkey: task, isSigner: false, isWritable: true },
       { pubkey: new PublicKey(requester), isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ...committeeNodes().map((pubkey) => ({
-        pubkey,
+      ...owners.map((owner) => ({
+        pubkey: nodePda(owner),
         isSigner: false,
         isWritable: false,
       })),
