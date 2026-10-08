@@ -4,6 +4,7 @@ import Field from "./Field.jsx";
 import FunctionView from "./FunctionView.jsx";
 import LaunchForm from "./LaunchForm.jsx";
 import { MazeSummary, MazeView } from "./MazePath.jsx";
+import NodeBrowser from "./NodeBrowser.jsx";
 import NodeList from "./NodeList.jsx";
 import RoundHistory from "./RoundHistory.jsx";
 import RoundStatus from "./RoundStatus.jsx";
@@ -63,6 +64,9 @@ export default function App() {
             <button type="button" className={view === "home" ? "on" : ""} onClick={() => setView("home")}>
               Rounds
             </button>
+            <button type="button" className={view === "nodes" ? "on" : ""} onClick={() => setView("nodes")}>
+              Nodes
+            </button>
             <button type="button" className={view === "functions" ? "on" : ""} onClick={() => setView("functions")}>
               Functions
             </button>
@@ -85,6 +89,8 @@ export default function App() {
       <main className="page" key={view}>
       {view === "launch" ? (
         <LaunchForm onOpenFunction={() => setView("functions")} />
+      ) : view === "nodes" ? (
+        <NodeBrowser />
       ) : view === "stake" ? (
         <StakeForm />
       ) : view === "functions" ? (

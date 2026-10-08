@@ -86,6 +86,7 @@ body {
   color: #c4b6d4;
   font: inherit;
   font-size: 14px;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
 }
@@ -1886,6 +1887,80 @@ h2,
 
 .my-requests .hint {
   margin-top: 12px;
+}
+
+.browser .sheet {
+  margin-top: 28px;
+}
+
+.browser .sheet-head,
+.browser .sheet-row {
+  grid-template-columns: 120px 120px 110px 130px minmax(72px, 1fr) 88px;
+}
+
+.browser .sheet-row > .mono {
+  white-space: nowrap;
+}
+
+.browser .sheet-head {
+  display: grid;
+}
+
+.browser .sheet-head button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+
+.browser .sheet-head button.on {
+  color: #1c2128;
+}
+
+.browser .sheet-head button.on::after {
+  content: " \2191";
+}
+
+.browser .sheet-head button.on.desc::after {
+  content: " \2193";
+}
+
+.browser .words {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.browser .hint {
+  max-width: 720px;
+}
+
+@media (max-width: 800px) {
+  .browser .sheet-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+
+  .browser .sheet-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    align-items: baseline;
+  }
+
+  .browser .row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
 }
 
 .env-check {

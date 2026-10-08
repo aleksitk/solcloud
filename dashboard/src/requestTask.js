@@ -371,14 +371,17 @@ export function formatDuration(seconds) {
   return `${Math.round(hours / 24)}d`;
 }
 
-// Mean time-to-reveal on finalized rounds only. The node never submits this.
-export function averageCompletion(rows) {
+function meanReveal(rows) {
   const samples = rows.filter(
     (row) => (row.outcome === "Won" || row.outcome === "Slashed") && row.seconds != null
   );
-  if (!samples.length) return "—";
-  const mean = samples.reduce((sum, row) => sum + row.seconds, 0) / samples.length;
-  return formatDuration(mean);
+  if (!samples.length) return null;
+  return samples.reduce((sum, row) => sum + row.seconds, 0) / samples.length;
+}
+
+// Mean time-to-reveal on finalized rounds only. The node never submits this.
+export function averageCompletion(rows) {
+  return formatDuration(meanReveal(rows));
 }
 
 function nodeOutcome(task, commit, result) {
@@ -395,51 +398,72 @@ function nodeOutcome(task, commit, result) {
   return { outcome: "Open", tone: "live" };
 }
 
-export async function readNodeHistory(owner) {
+async function accountsInfo(keys) {
+  const infos = [];
+  for (let start = 0; start < keys.length; start += 100) {
+    const part = keys.slice(start, start + 100);
+    const next = await withRetries(() => connection.getMultipleAccountsInfo(part));
+    infos.push(...next);
+  }
+  return infos;
+}
+
+async function loadCommitRows(owners) {
+  const grouped = new Map(owners.map((owner) => [owner, []]));
+  if (!owners.length) return grouped;
+
   const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
   const configInfo = await readAccount(config);
   if (!configInfo) throw new Error("The protocol config is missing on devnet.");
   const count = Number(readTaskCount(configInfo.data));
-  if (!count) return [];
+  if (!count) return grouped;
 
-  const ownerKey = new PublicKey(owner);
   const tasks = [];
-  const commitKeys = [];
-  for (let id = 1; id <= count; id += 1) {
-    const task = taskPda(BigInt(id));
-    tasks.push(task);
-    commitKeys.push(
-      PublicKey.findProgramAddressSync(
-        [Buffer.from("commit"), task.toBuffer(), ownerKey.toBuffer()],
-        PROGRAM_ID
-      )[0]
-    );
-  }
+  for (let id = 1; id <= count; id += 1) tasks.push(taskPda(BigInt(id)));
+  const taskInfos = await accountsInfo(tasks);
 
-  const commitInfos = await withRetries(() => connection.getMultipleAccountsInfo(commitKeys));
-  const present = [];
+  const commitKeys = [];
+  const commitWhere = [];
+  for (const owner of owners) {
+    const ownerKey = new PublicKey(owner);
+    for (let index = 0; index < tasks.length; index += 1) {
+      commitKeys.push(
+        PublicKey.findProgramAddressSync(
+          [Buffer.from("commit"), tasks[index].toBuffer(), ownerKey.toBuffer()],
+          PROGRAM_ID
+        )[0]
+      );
+      commitWhere.push({ owner, index });
+    }
+  }
+  const commitInfos = await accountsInfo(commitKeys);
+
+  const needed = [];
+  const hits = [];
   for (let index = 0; index < commitInfos.length; index += 1) {
     if (!commitInfos[index]) continue;
     const commit = parseCommit(commitInfos[index].data);
-    if (commit) present.push({ index, commit });
+    if (!commit) continue;
+    needed.push(commitWhere[index]);
+    hits.push(commit);
   }
-  if (!present.length) return [];
+  if (!hits.length) return grouped;
 
-  const taskKeys = present.map((row) => tasks[row.index]);
-  const taskInfos = await withRetries(() => connection.getMultipleAccountsInfo(taskKeys));
-  const resultKeys = taskKeys.map(
-    (task) => PublicKey.findProgramAddressSync([Buffer.from("result"), task.toBuffer()], PROGRAM_ID)[0]
+  const taskIndexes = [...new Set(needed.map((item) => item.index))];
+  const resultKeys = taskIndexes.map(
+    (index) => PublicKey.findProgramAddressSync([Buffer.from("result"), tasks[index].toBuffer()], PROGRAM_ID)[0]
   );
-  const resultInfos = await withRetries(() => connection.getMultipleAccountsInfo(resultKeys));
+  const resultInfos = await accountsInfo(resultKeys);
+  const resultByIndex = new Map(taskIndexes.map((index, position) => [index, resultInfos[position]]));
 
-  const rows = [];
-  for (let index = 0; index < present.length; index += 1) {
-    if (!taskInfos[index]) continue;
-    const task = parseTask(taskInfos[index].data, BigInt(present[index].index + 1), taskKeys[index]);
-    const result = parseResult(resultInfos[index]?.data);
-    const seconds = revealSeconds(task.createdAt, present[index].commit.revealedAt);
-    const verdict = nodeOutcome(task, present[index].commit, result);
-    rows.push({
+  for (let index = 0; index < hits.length; index += 1) {
+    const where = needed[index];
+    if (!taskInfos[where.index]) continue;
+    const task = parseTask(taskInfos[where.index].data, BigInt(where.index + 1), tasks[where.index]);
+    const result = parseResult(resultByIndex.get(where.index)?.data);
+    const seconds = revealSeconds(task.createdAt, hits[index].revealedAt);
+    const verdict = nodeOutcome(task, hits[index], result);
+    grouped.get(where.owner).push({
       id: task.id,
       address: task.address,
       committee: task.committee,
@@ -448,8 +472,43 @@ export async function readNodeHistory(owner) {
       ...verdict,
     });
   }
-  rows.sort((a, b) => b.id.localeCompare(a.id));
-  return rows;
+  for (const rows of grouped.values()) rows.sort((a, b) => b.id.localeCompare(a.id));
+  return grouped;
+}
+
+export async function readNodeHistory(owner) {
+  const grouped = await loadCommitRows([owner]);
+  return grouped.get(owner) || [];
+}
+
+const COMMITTEE_SIZES = [3, 5, 7, 9, 11];
+
+export async function readNodeBrowser() {
+  const nodes = (await readNodes()).filter((node) => node.status === "Active");
+  const sizes = COMMITTEE_SIZES.filter((size) => size <= nodes.length);
+  const grouped = await loadCommitRows(nodes.map((node) => node.owner));
+  return nodes.map((node) => {
+    const seconds = meanReveal(grouped.get(node.owner) || []);
+    return {
+      ...node,
+      sizes,
+      sizesText: sizes.length ? sizes.join(" ") : "—",
+      average: formatDuration(seconds),
+      averageSeconds: seconds,
+    };
+  });
+}
+
+function successOf(completed, slashed) {
+  const settled = completed + slashed;
+  if (settled === 0n) return { success: "None yet", successRank: null };
+  const tenths = Number((completed * 1000n) / settled);
+  const whole = Math.floor(tenths / 10);
+  const fraction = tenths % 10;
+  return {
+    success: fraction === 0 ? `${whole}%` : `${whole}.${fraction}%`,
+    successRank: tenths,
+  };
 }
 
 export async function findNode(owner) {
@@ -460,14 +519,6 @@ export async function findNode(owner) {
   const status = data[48];
   const completed = data.length >= 65 ? data.readBigUInt64LE(57) : 0n;
   const slashed = data.length >= 74 ? data.readBigUInt64LE(66) : 0n;
-  const settled = completed + slashed;
-  let success = "None yet";
-  if (settled > 0n) {
-    const tenths = Number((completed * 1000n) / settled);
-    const whole = Math.floor(tenths / 10);
-    const fraction = tenths % 10;
-    success = fraction === 0 ? `${whole}%` : `${whole}.${fraction}%`;
-  }
   return {
     address: node.toBase58(),
     stake: data.readBigUInt64LE(40),
@@ -475,7 +526,7 @@ export async function findNode(owner) {
     tone: status === 2 ? "bad" : status === 0 ? "good" : "muted",
     completed,
     slashed,
-    success,
+    ...successOf(completed, slashed),
   };
 }
 
@@ -497,6 +548,8 @@ export async function readNodes() {
     const stake = data.readBigUInt64LE(40);
     const status = data[48];
     const reputation = data.readBigInt64LE(49);
+    const completed = data.length >= 65 ? data.readBigUInt64LE(57) : 0n;
+    const slashed = data.length >= 74 ? data.readBigUInt64LE(66) : 0n;
     const order = known.get(owner);
     return {
       id: order === undefined ? shortOwner(owner) : String(order + 1).padStart(2, "0"),
@@ -506,8 +559,10 @@ export async function readNodes() {
       status: NODE_STATUS[status] || "Unknown",
       reputation,
       tone: status === 2 ? "bad" : status === 0 ? "good" : "muted",
+      stake,
       stakeText: solText(stake),
       reduced: stake < 1_000_000_000n,
+      ...successOf(completed, slashed),
     };
   });
   nodes.sort((a, b) => a.order - b.order || a.owner.localeCompare(b.owner));
