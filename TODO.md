@@ -112,7 +112,7 @@
 
 - [x] Init React + Tailwind dashboard (dark theme, devnet landing). `@solana/web3.js` is not a dependency yet; balance is read from RPC directly
 - [x] Wallet connect (Phantom/Solflare, devnet)
-- [x] Function registration UI. Functions shows the labyrinth Wasm hash that `request_task` already stores. There is no separate register instruction, and the field is read-only because nodes only run this hash
+- [x] Function registration UI. Functions shows the labyrinth Wasm hash that `request_task` already stores. There is no separate register instruction. User-written AssemblyScript is the next section
 - [x] Task launch UI (input parameters, reward, **committee size selector 3/5/7/9/11**). The connected wallet signs `request_task` on devnet. Only N=3 can be submitted; three nodes are staked
 - [x] Live status: Requested → Committed (x/N) → Revealed (x/N) → Finalized/Failed. The home page reads the latest task from devnet and refreshes until it settles
 - [x] Node list: stake and status, read from the three devnet node accounts. Last activity is not stored on the node, so it is not shown
@@ -121,6 +121,18 @@
 - [x] Consumer path for the latest maze round. The home page keeps a labeled row; Open map shows the entrance and exit on their own view. Length 35628 matches the nodes
 - [x] Responsive layout for a phone-width screen: header, hero, round rows, and the task form
 - [x] Show committee size + threshold clearly per task (e.g. "3 of 3", need 2). The settled list and the latest-round card both show it
+
+---
+
+## Next — A user-written AssemblyScript function
+
+The chain already accepts any Wasm hash. The labyrinth stays the built-in demo: the map view draws only that program. Another function is a second AssemblyScript module with one shared export. The editor is a text field and a Compile button, not a full IDE.
+
+- [ ] One ABI: `run` reads input bytes and returns output bytes, with a size cap. Integer-only, no host imports except `abort`
+- [ ] A node runner loads a Wasm file with that export, checks the SHA-256, and runs it on a worker thread with a timeout
+- [ ] Dashboard editor: AssemblyScript source, compile with `asc`, show the hash, and use that hash on the next task
+- [ ] For the demo, the compiled file stays on the machine the nodes read. Public hosting is still the Phase 1 item (IPFS/Arweave/HTTPS)
+- [ ] Keep the labyrinth registered. Tasks that are not the maze show the output bytes, not the map
 
 ---
 
