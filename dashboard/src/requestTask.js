@@ -285,7 +285,26 @@ export async function findNode(owner) {
   const info = await readAccount(node);
   if (!info) return null;
   const data = Buffer.from(info.data);
-  return { address: node.toBase58(), stake: data.readBigUInt64LE(40) };
+  const status = data[48];
+  const completed = data.length >= 65 ? data.readBigUInt64LE(57) : 0n;
+  const slashed = data.length >= 74 ? data.readBigUInt64LE(66) : 0n;
+  const settled = completed + slashed;
+  let success = "None yet";
+  if (settled > 0n) {
+    const tenths = Number((completed * 1000n) / settled);
+    const whole = Math.floor(tenths / 10);
+    const fraction = tenths % 10;
+    success = fraction === 0 ? `${whole}%` : `${whole}.${fraction}%`;
+  }
+  return {
+    address: node.toBase58(),
+    stake: data.readBigUInt64LE(40),
+    status: NODE_STATUS[status] || "Unknown",
+    tone: status === 2 ? "bad" : status === 0 ? "good" : "muted",
+    completed,
+    slashed,
+    success,
+  };
 }
 
 // Nodes created before tasks_slashed are 66 bytes. Finalize grows them to 74.

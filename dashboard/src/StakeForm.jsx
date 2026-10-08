@@ -25,6 +25,7 @@ export default function StakeForm() {
   const [minStake, setMinStake] = useState(1_000_000_000n);
   const [stake, setStake] = useState("1");
   const [existing, setExisting] = useState(null);
+  const [lookup, setLookup] = useState("idle");
   const [review, setReview] = useState(null);
   const [phase, setPhase] = useState("idle");
   const [result, setResult] = useState(null);
@@ -46,14 +47,20 @@ export default function StakeForm() {
     let live = true;
     if (!wallet.address) {
       setExisting(null);
+      setLookup("idle");
       return undefined;
     }
+    setLookup("reading");
     findNode(wallet.address)
       .then((node) => {
-        if (live) setExisting(node);
+        if (!live) return;
+        setExisting(node);
+        setLookup("ready");
       })
       .catch(() => {
-        if (live) setExisting(null);
+        if (!live) return;
+        setExisting(null);
+        setLookup("ready");
       });
     return () => {
       live = false;
@@ -103,16 +110,50 @@ export default function StakeForm() {
 
   return (
     <section className="shell launch">
-      <p className="kicker">Join</p>
-      <h1>Stake a node.</h1>
+      <p className="kicker">{existing ? "Operator" : "Join"}</p>
+      <h1>{existing ? "My node." : "Stake a node."}</h1>
       <p className="lede">
-        Lock at least {solLabel(minStake)} SOL from this wallet. That wallet becomes a node on devnet.
-        The stake stays in the node account.
+        {existing
+          ? "Stake, status, and the rounds this node won or lost. The chain writes these when a round settles."
+          : `Lock at least ${solLabel(minStake)} SOL from this wallet. That wallet becomes a node on devnet. The stake stays in the node account.`}
       </p>
 
-      {existing ? (
-        <div className="review">
-          <p>This wallet is already a node. Stake {solLabel(existing.stake)} SOL.</p>
+      {lookup === "reading" ? (
+        <p className="hint">Reading this wallet's node…</p>
+      ) : existing ? (
+        <div className="mine">
+          <div className="ledger-head">
+            <h2>My node</h2>
+            <span className="status">
+              <b>
+                <i className={existing.tone} />
+                {existing.status}
+              </b>
+            </span>
+          </div>
+          <dl className="mine-stats">
+            <div>
+              <dt>Stake</dt>
+              <dd>{solLabel(existing.stake)} SOL</dd>
+            </div>
+            <div>
+              <dt>Completed</dt>
+              <dd>{existing.completed.toString()}</dd>
+            </div>
+            <div>
+              <dt>Slashed</dt>
+              <dd>{existing.slashed.toString()}</dd>
+            </div>
+            <div>
+              <dt>Success</dt>
+              <dd className={existing.success.endsWith("%") ? undefined : "words"}>{existing.success}</dd>
+            </div>
+          </dl>
+          <p className="hint">
+            <a href={`https://explorer.solana.com/address/${existing.address}?cluster=devnet`} target="_blank" rel="noreferrer">
+              View the node account
+            </a>
+          </p>
         </div>
       ) : (
         <form className="launch-form" onSubmit={onSubmit}>

@@ -131,7 +131,7 @@
 
 Two paths on the site that already exists. No new instruction beyond the three marketplace fields in Phase 3. The same rule: show only what the chain already recorded.
 
-- [ ] My Node: stake, status (active or slashed), tasks completed, tasks slashed, and the success rate
+- [x] My Node: stake, status (active or slashed), tasks completed, tasks slashed, and the success rate. Shown on the stake page when the connected wallet is already a node. With no settled rounds the success line says “None yet” instead of a percentage
 - [ ] Task history for the connected node, from its commit accounts. Each row is a task id, committee size, outcome (won, slashed, or timed out), and time-to-reveal (`revealed_at` minus the task's `created_at`)
 - [ ] Average completion time: the mean of those reveal times on finalized tasks. The node browser sorts with this. The node does not submit the number
 - [ ] Environment check: the operator runs `worker/check.mjs` on their own machine before staking. My Node shows pass or fail once. That result is not a filter

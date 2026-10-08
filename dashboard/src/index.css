@@ -1818,3 +1818,59 @@ h2,
 .panel .nodes-row .go {
   display: none;
 }
+
+.mine {
+  max-width: 720px;
+  margin-top: 28px;
+  padding: 8px 22px 18px;
+  border: 1px solid rgba(23, 21, 28, 0.1);
+  border-radius: 24px;
+  background: #fff;
+}
+
+.mine .ledger-head {
+  align-items: center;
+}
+
+.mine-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin: 8px 0 4px;
+}
+
+.mine-stats div {
+  padding-top: 14px;
+  border-top: 1px solid rgba(23, 21, 28, 0.08);
+}
+
+.mine-stats dt {
+  color: #5c6570;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mine-stats dd {
+  margin: 8px 0 0;
+  color: #1c2128;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.mine-stats dd.words {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.mine .hint a {
+  color: #0b7a4b;
+}
+
+@media (max-width: 800px) {
+  .mine-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+}
