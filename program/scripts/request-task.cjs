@@ -42,12 +42,45 @@ function loadKeypair(file) {
   return Keypair.fromSecretKey(secret);
 }
 
+const ACTIVE_NODES_AT = 107;
+
+function readActiveOwners(data) {
+  if (!data || data.length < ACTIVE_NODES_AT + 4) return null;
+  const bytes = Buffer.from(data);
+  const count = bytes.readUInt32LE(ACTIVE_NODES_AT);
+  if (count > 32) return null;
+  const need = ACTIVE_NODES_AT + 4 + count * 32;
+  if (bytes.length < need) return null;
+  const owners = [];
+  for (let index = 0; index < count; index += 1) {
+    const start = ACTIVE_NODES_AT + 4 + index * 32;
+    owners.push(new PublicKey(bytes.subarray(start, start + 32)).toBase58());
+  }
+  return owners;
+}
+
+function selectCommittee(owners, size, seedSlot, taskId) {
+  const input = Buffer.alloc(16);
+  input.writeBigUInt64LE(BigInt(seedSlot), 0);
+  input.writeBigUInt64LE(BigInt(taskId), 8);
+  let state = crypto.createHash("sha256").update(input).digest();
+  const order = owners.slice();
+  for (let index = order.length - 1; index > 0; index -= 1) {
+    state = crypto.createHash("sha256").update(state).digest();
+    const swapAt = Number(state.readBigUInt64LE(0) % BigInt(index + 1));
+    const held = order[index];
+    order[index] = order[swapAt];
+    order[swapAt] = held;
+  }
+  return order.slice(0, size);
+}
+
 async function main() {
   const home = path.join(os.homedir(), ".config", "solana");
   const requester = loadKeypair(path.join(home, "id.json"));
   const connection = new Connection(RPC, "confirmed");
 
-  const nodeAccounts = [1, 2, 3].map((n) => {
+  let nodeAccounts = [1, 2, 3].map((n) => {
     const owner = loadKeypair(path.join(home, `solcloud-node${n}.json`));
     const [pda] = PublicKey.findProgramAddressSync(
       [Buffer.from("node"), owner.publicKey.toBuffer()],
@@ -82,6 +115,23 @@ async function main() {
 
   // Wasm input: seed = 1 (u64 LE), size = 512 (u32 LE).
   const input = Buffer.concat([u64(1n), u32(512)]);
+  const configInfo = await connection.getAccountInfo(config);
+  const registry = readActiveOwners(configInfo?.data);
+  let seedSlot = null;
+  if (registry) {
+    if (registry.length < 3) {
+      throw new Error(`Only ${registry.length} nodes are in the on-chain registry.`);
+    }
+    seedSlot = await connection.getSlot("processed");
+    const picked = selectCommittee(registry, 3, seedSlot, TASK_ID);
+    nodeAccounts = picked.map((owner) => {
+      const [pda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("node"), new PublicKey(owner).toBuffer()],
+        PROGRAM_ID
+      );
+      return pda;
+    });
+  }
   const data = Buffer.concat([
     discriminator("request_task"),
     u64(TASK_ID),
@@ -90,6 +140,7 @@ async function main() {
     input,
     u64(REWARD),
     Buffer.from([3]),
+    ...(seedSlot === null ? [] : [u64(BigInt(seedSlot))]),
   ]);
 
   const ix = new TransactionInstruction({

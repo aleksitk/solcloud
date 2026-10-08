@@ -402,6 +402,57 @@ export async function committeeSeed() {
   return new Uint32Array(digest)[0];
 }
 
+// Config bytes before active_nodes: discriminator plus the original fields.
+const ACTIVE_NODES_AT = 107;
+export const MAX_SEED_SLOT_LAG = 300;
+
+// Owners stored on the upgraded config, in registry order.
+// null means the live account is still the old size.
+export async function readActiveOwners() {
+  const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
+  const info = await readAccount(config);
+  if (!info) throw new Error("The protocol config is missing on devnet.");
+  const data = Buffer.from(info.data);
+  if (data.length < ACTIVE_NODES_AT + 4) return null;
+  const count = data.readUInt32LE(ACTIVE_NODES_AT);
+  if (count > 32) return null;
+  const need = ACTIVE_NODES_AT + 4 + count * 32;
+  if (data.length < need) return null;
+  const owners = [];
+  for (let index = 0; index < count; index += 1) {
+    const start = ACTIVE_NODES_AT + 4 + index * 32;
+    owners.push(new PublicKey(data.subarray(start, start + 32)).toBase58());
+  }
+  return owners;
+}
+
+async function sha256Bytes(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return new Uint8Array(digest);
+}
+
+// Same draw as the program: sha256(slot_le ‖ task_id_le), then Fisher-Yates.
+export async function selectCommittee(owners, size, seedSlot, taskId) {
+  const input = Buffer.alloc(16);
+  input.writeBigUInt64LE(BigInt(seedSlot), 0);
+  input.writeBigUInt64LE(BigInt(taskId), 8);
+  let state = await sha256Bytes(input);
+  const order = owners.slice();
+  for (let index = order.length - 1; index > 0; index -= 1) {
+    state = await sha256Bytes(state);
+    const draw = Buffer.from(state).readBigUInt64LE(0);
+    const swapAt = Number(draw % BigInt(index + 1));
+    const held = order[index];
+    order[index] = order[swapAt];
+    order[swapAt] = held;
+  }
+  return order.slice(0, size);
+}
+
+export async function currentSlot() {
+  return withRetries(() => connection.getSlot("processed"));
+}
+
 export async function nextTaskId() {
   const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
   const info = await withRetries(() => connection.getAccountInfo(config));
@@ -429,6 +480,7 @@ export async function buildRequestTask({
   wasmHash = WASM_HASH,
   committeeSize,
   owners,
+  seedSlot,
 }) {
   if (!Number.isInteger(committeeSize) || !Array.isArray(owners) || owners.length !== committeeSize) {
     throw new Error("The committee does not match the chosen size.");
@@ -448,6 +500,7 @@ export async function buildRequestTask({
     input,
     u64(rewardLamports),
     Buffer.from([committeeSize]),
+    ...(seedSlot === undefined || seedSlot === null ? [] : [u64(seedSlot)]),
   ]);
 
   const ix = new TransactionInstruction({

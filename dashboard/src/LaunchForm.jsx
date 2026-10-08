@@ -3,10 +3,13 @@ import {
   activeNodes,
   buildRequestTask,
   committeeSeed,
+  currentSlot,
   explorerTx,
   pickCommittee,
   nextTaskId,
+  readActiveOwners,
   readNodes,
+  selectCommittee,
   sendSigned,
   solToLamports,
 } from "./requestTask.js";
@@ -37,21 +40,33 @@ export default function LaunchForm({ onOpenFunction }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [activeCount, setActiveCount] = useState(null);
+  const [registry, setRegistry] = useState(undefined);
 
   useEffect(() => {
     let cancelled = false;
-    readNodes()
-      .then((nodes) => {
-        if (!cancelled) setActiveCount(activeNodes(nodes).length);
+    Promise.all([readNodes(), readActiveOwners()])
+      .then(([nodes, owners]) => {
+        if (cancelled) return;
+        if (owners) {
+          setRegistry(owners.length);
+          setActiveCount(owners.length);
+        } else {
+          setRegistry(null);
+          setActiveCount(activeNodes(nodes).length);
+        }
       })
       .catch(() => {
-        if (!cancelled) setActiveCount(null);
+        if (!cancelled) {
+          setRegistry(null);
+          setActiveCount(null);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const drawsOnChain = typeof registry === "number";
   const threshold = thresholdOf(size);
   const rewardNum = Number(reward);
   const seedNum = Number(seed);
@@ -80,6 +95,40 @@ export default function LaunchForm({ onOpenFunction }) {
     setError("");
     setPhase("reading");
     try {
+      const owners = await readActiveOwners();
+      if (owners) {
+        setRegistry(owners.length);
+        setActiveCount(owners.length);
+        if (owners.length < size) {
+          setReview(null);
+          setError(`Only ${owners.length} nodes are in the on-chain registry. Choose a smaller committee.`);
+          setPhase("idle");
+          return;
+        }
+        const { id } = await nextTaskId();
+        const slot = await currentSlot();
+        const pickedOwners = await selectCommittee(owners, size, slot, id);
+        const nodes = await readNodes();
+        const byOwner = new Map(nodes.map((node) => [node.owner, node]));
+        setReview({
+          size,
+          threshold,
+          reward: rewardNum,
+          seed: seedNum,
+          maze: mazeNum,
+          onChain: true,
+          taskId: id.toString(),
+          seedSlot: String(slot),
+          nodes: pickedOwners.map((owner) => ({
+            id: byOwner.get(owner)?.id || `${owner.slice(0, 4)}…${owner.slice(-4)}`,
+            owner,
+          })),
+        });
+        setPhase("idle");
+        return;
+      }
+
+      setRegistry(null);
       const nodes = await readNodes();
       const active = activeNodes(nodes);
       const picked = pickCommittee(active, size, await committeeSeed());
@@ -96,6 +145,7 @@ export default function LaunchForm({ onOpenFunction }) {
         reward: rewardNum,
         seed: seedNum,
         maze: mazeNum,
+        onChain: false,
         nodes: picked.map((node) => ({ id: node.id, owner: node.owner })),
       });
       setPhase("idle");
@@ -111,23 +161,63 @@ export default function LaunchForm({ onOpenFunction }) {
     setPhase("preparing");
     setError("");
     try {
-      const { id } = await nextTaskId();
+      let taskId;
+      let owners = review.nodes.map((node) => node.owner);
+      let seedSlot;
+      if (review.onChain) {
+        const slot = await currentSlot();
+        const registryOwners = await readActiveOwners();
+        if (!registryOwners || registryOwners.length < review.size) {
+          throw new Error("The node registry changed. Review the request again.");
+        }
+        const picked = await selectCommittee(
+          registryOwners,
+          review.size,
+          slot,
+          BigInt(review.taskId)
+        );
+        const same =
+          picked.length === owners.length &&
+          picked.every((owner, index) => owner === owners[index]);
+        if (!same) {
+          const nodes = await readNodes();
+          const byOwner = new Map(nodes.map((node) => [node.owner, node]));
+          setReview({
+            ...review,
+            seedSlot: String(slot),
+            nodes: picked.map((owner) => ({
+              id: byOwner.get(owner)?.id || `${owner.slice(0, 4)}…${owner.slice(-4)}`,
+              owner,
+            })),
+          });
+          setError("The slot draw changed. Check the nodes, then sign.");
+          setPhase("idle");
+          return;
+        }
+        taskId = BigInt(review.taskId);
+        seedSlot = slot;
+        owners = picked;
+      } else {
+        const next = await nextTaskId();
+        taskId = next.id;
+      }
       const built = await buildRequestTask({
         requester: wallet.address,
-        taskId: id,
+        taskId,
         rewardLamports: solToLamports(reward),
         seed: review.seed,
         mazeSize: review.maze,
         wasmHash: choice.hash,
         committeeSize: review.size,
-        owners: review.nodes.map((node) => node.owner),
+        owners,
+        seedSlot,
       });
       setPhase("signing");
       const signed = await wallet.signTransaction(built.tx);
       setPhase("sending");
       const signature = await sendSigned(signed, built.blockhash, built.lastValidBlockHeight);
       setResult({
-        id: id.toString(),
+        id: taskId.toString(),
         task: built.task.toBase58(),
         signature,
       });
@@ -167,7 +257,10 @@ export default function LaunchForm({ onOpenFunction }) {
             ))}
           </div>
           <p className="hint">
-            {threshold} of {size} must agree. Active nodes, highest reputation first. A tie follows the latest block hash.
+            {threshold} of {size} must agree.{" "}
+            {drawsOnChain
+              ? "The program draws the committee from registered nodes, using this slot and the task id. Sign within about two minutes."
+              : "Active nodes, highest reputation first. A tie follows the latest block hash."}
             {activeCount === null
               ? " Reading staked nodes…"
               : needsMoreNodes

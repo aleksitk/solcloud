@@ -44,4 +44,10 @@ pub enum SolCloudError {
     RegistryFull,
     #[msg("Only the config authority can do this.")]
     BadAuthority,
+    #[msg("The remaining accounts are not the committee drawn for this slot.")]
+    CommitteeMismatch,
+    #[msg("That seed slot is still in the future.")]
+    SeedSlotInFuture,
+    #[msg("That seed slot is too old. Review the request again.")]
+    SeedSlotExpired,
 }

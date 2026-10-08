@@ -6,6 +6,10 @@ pub const MIN_COMMITTEE_SIZE: u8 = 3;
 pub const MAX_COMMITTEE_SIZE: u8 = 11;
 /// How many active node owners Config can remember. Demo cap.
 pub const MAX_ACTIVE_NODES: usize = 32;
+/// A wallet prompt cannot land in the same slot the transaction was built for.
+/// The requester names a slot it just read. Older than this, the draw is rejected.
+/// 300 slots is about two minutes.
+pub const MAX_SEED_SLOT_LAG: u64 = 300;
 
 /// Max byte length of a task input (kept small — travels in the transaction).
 pub const MAX_INPUT_LEN: usize = 64;

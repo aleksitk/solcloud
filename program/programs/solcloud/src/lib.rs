@@ -136,8 +136,11 @@ pub mod solcloud {
 
     /// A dApp requests an off-chain computation and escrows the reward.
     ///
-    /// Pass exactly `committee_size` registered node accounts as remaining
-    /// accounts. The requester chooses N (odd, 3..=11).
+    /// The requester chooses N (odd, 3..=11) and a slot it just observed.
+    /// The program draws N owners from `config.active_nodes` with
+    /// `sha256(slot ‖ task_id)` and rejects any other remaining-accounts list.
+    /// The landing slot itself is not the seed: a wallet signature cannot be
+    /// built and landed inside one 400ms slot.
     pub fn request_task(
         ctx: Context<RequestTask>,
         task_id: u64,
@@ -145,6 +148,7 @@ pub mod solcloud {
         input: Vec<u8>,
         reward: u64,
         committee_size: u8,
+        seed_slot: u64,
     ) -> Result<()> {
         require!(input.len() <= MAX_INPUT_LEN, SolCloudError::InputTooLarge);
         require!(
@@ -152,32 +156,41 @@ pub mod solcloud {
             SolCloudError::InvalidCommitteeSize
         );
         require!(committee_size % 2 == 1, SolCloudError::CommitteeSizeNotOdd);
-        let committee_len = ctx.remaining_accounts.len();
+        let committee_len = committee_size as usize;
         require!(
-            committee_len == committee_size as usize,
+            ctx.remaining_accounts.len() == committee_len,
+            SolCloudError::NotEnoughNodes
+        );
+        require!(
+            ctx.accounts.config.active_nodes.len() >= committee_len,
             SolCloudError::NotEnoughNodes
         );
 
-        let mut committee: Vec<Pubkey> = Vec::new();
+        let clock = Clock::get()?;
+        require!(seed_slot <= clock.slot, SolCloudError::SeedSlotInFuture);
+        require!(
+            clock.slot - seed_slot <= MAX_SEED_SLOT_LAG,
+            SolCloudError::SeedSlotExpired
+        );
+        let seed = committee_seed(seed_slot, task_id);
+        let committee = select_committee(&ctx.accounts.config.active_nodes, committee_len, &seed);
+
         for i in 0..committee_len {
-            let node = read_node(&ctx.remaining_accounts[i])?;
+            let expected = committee[i];
             let (pda, _) = Pubkey::find_program_address(
-                &[NODE_SEED, node.owner.as_ref()],
+                &[NODE_SEED, expected.as_ref()],
                 ctx.program_id,
             );
             require!(
                 pda == ctx.remaining_accounts[i].key(),
-                SolCloudError::InvalidCommitteeNode
+                SolCloudError::CommitteeMismatch
             );
+            let node = read_node(&ctx.remaining_accounts[i])?;
+            require!(node.owner == expected, SolCloudError::InvalidCommitteeNode);
             require!(
                 node.status == NodeStatus::Active,
                 SolCloudError::NodeNotActive
             );
-            require!(
-                !committee.contains(&node.owner),
-                SolCloudError::DuplicateCommitteeNode
-            );
-            committee.push(node.owner);
         }
 
         transfer_from_signer(
@@ -530,6 +543,29 @@ fn sha256(data: &[u8]) -> [u8; 32] {
     hash(data).to_bytes()
 }
 
+/// `sha256(slot_le ‖ task_id_le)`. Public: the client runs this same mix.
+fn committee_seed(slot: u64, task_id: u64) -> [u8; 32] {
+    let mut input = [0u8; 16];
+    input[..8].copy_from_slice(&slot.to_le_bytes());
+    input[8..].copy_from_slice(&task_id.to_le_bytes());
+    hash(&input).to_bytes()
+}
+
+/// Fisher-Yates shuffle of `nodes`, then the first `size` owners.
+/// The same seed always returns the same order.
+fn select_committee(nodes: &[Pubkey], size: usize, seed: &[u8; 32]) -> Vec<Pubkey> {
+    let mut order = nodes.to_vec();
+    let mut state = *seed;
+    for i in (1..order.len()).rev() {
+        state = hash(&state).to_bytes();
+        let draw = u64::from_le_bytes(state[..8].try_into().unwrap());
+        let j = (draw % (i as u64 + 1)) as usize;
+        order.swap(i, j);
+    }
+    order.truncate(size);
+    order
+}
+
 fn push_active_node(config: &mut Config, owner: Pubkey) -> Result<()> {
     if config.active_nodes.contains(&owner) {
         return Ok(());
@@ -733,4 +769,46 @@ pub struct RefundExpired<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[cfg(test)]
+mod committee_tests {
+    use super::*;
+
+    fn key(byte: u8) -> Pubkey {
+        Pubkey::new_from_array([byte; 32])
+    }
+
+    #[test]
+    fn committee_draw_is_stable_and_inside_the_registry() {
+        let nodes: Vec<Pubkey> = (1..=5).map(key).collect();
+        let seed = committee_seed(100, 7);
+        let picked = select_committee(&nodes, 3, &seed);
+        assert_eq!(picked, select_committee(&nodes, 3, &seed));
+        assert_eq!(picked.len(), 3);
+        let mut seen = std::collections::BTreeSet::new();
+        for owner in &picked {
+            assert!(nodes.contains(owner));
+            assert!(seen.insert(*owner));
+        }
+        // Locked so the dashboard shuffle can be checked against these bytes.
+        let hex: String = picked
+            .iter()
+            .map(|owner| {
+                owner
+                    .to_bytes()
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        assert_eq!(
+            hex,
+            "\
+0101010101010101010101010101010101010101010101010101010101010101,\
+0303030303030303030303030303030303030303030303030303030303030303,\
+0202020202020202020202020202020202020202020202020202020202020202"
+        );
+    }
 }
