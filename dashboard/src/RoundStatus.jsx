@@ -1,0 +1,62 @@
+import { useEffect, useState } from "react";
+import { describeRound, latestRound, readRound } from "./requestTask.js";
+
+const SETTLED = new Set(["Finalized", "Failed", "Refunded"]);
+
+function explorerAddress(address) {
+  return `https://explorer.solana.com/address/${address}?cluster=devnet`;
+}
+
+export default function RoundStatus({ taskId, label = "Latest round", compact = false }) {
+  const [round, setRound] = useState(null);
+  const [note, setNote] = useState("Reading the round…");
+
+  useEffect(() => {
+    let stop = false;
+    let timer = 0;
+    let running = false;
+
+    async function load() {
+      if (running) return;
+      running = true;
+      try {
+        const next = taskId ? await readRound(BigInt(taskId)) : await latestRound();
+        if (stop) return;
+        setRound(next);
+        setNote(next ? "" : "No round has been opened yet.");
+        if (next && SETTLED.has(next.status)) clearInterval(timer);
+      } catch (err) {
+        if (!stop) setNote(err?.message || "Devnet is not responding.");
+      } finally {
+        running = false;
+      }
+    }
+
+    load();
+    timer = setInterval(load, 8000);
+    return () => {
+      stop = true;
+      clearInterval(timer);
+    };
+  }, [taskId]);
+
+  if (!round) {
+    return <p className={compact ? "hint" : "live-note"}>{note}</p>;
+  }
+
+  return (
+    <section className={compact ? "live-round compact" : "live-round"} aria-live="polite">
+      <div>
+        <p className="kicker">{label}</p>
+        <h2>
+          <i className={`live-dot ${round.tone}`} />
+          {round.status}
+        </h2>
+        <p>{describeRound(round)}</p>
+      </div>
+      <a href={explorerAddress(round.address)} target="_blank" rel="noreferrer">
+        Round {round.id}
+      </a>
+    </section>
+  );
+}

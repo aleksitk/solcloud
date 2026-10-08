@@ -79,6 +79,80 @@ function readTaskCount(data) {
   return new DataView(bytes.buffer).getBigUint64(96, true);
 }
 
+const ROUND_STATUS = ["Requested", "Committing", "Revealing", "Finalized", "Failed", "Refunded"];
+
+function taskPda(taskId) {
+  return PublicKey.findProgramAddressSync([Buffer.from("task"), u64(taskId)], PROGRAM_ID)[0];
+}
+
+async function readAccount(pubkey) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await connection.getAccountInfo(pubkey);
+    } catch (err) {
+      lastError = err;
+      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 800));
+    }
+  }
+  throw lastError;
+}
+
+export function describeRound(round) {
+  const size = round.committee;
+  const need = round.threshold;
+  if (round.status === "Committing") {
+    return `${round.commits} of ${size} committed. ${need} of ${size} must agree.`;
+  }
+  if (round.status === "Revealing") {
+    return `${round.reveals} of ${size} revealed. ${need} of ${size} must agree.`;
+  }
+  if (round.status === "Finalized") {
+    return `${round.reveals} of ${size} revealed. The majority was paid.`;
+  }
+  if (round.status === "Refunded") {
+    return "The reward returned to the requester.";
+  }
+  if (round.status === "Failed") {
+    return "The round failed before a result was stored.";
+  }
+  return `${need} of ${size} must agree.`;
+}
+
+export async function readRound(taskId) {
+  const task = taskPda(taskId);
+  const info = await readAccount(task);
+  if (!info) return null;
+  const data = Uint8Array.from(info.data);
+  const view = new DataView(data.buffer);
+  const inputLen = view.getUint32(72, true);
+  let offset = 76 + inputLen + 8;
+  const committee = data[offset];
+  offset += 1;
+  const committeeLen = view.getUint32(offset, true);
+  offset += 4 + committeeLen * 32;
+  const status = data[offset];
+  return {
+    id: taskId.toString().padStart(2, "0"),
+    address: task.toBase58(),
+    status: ROUND_STATUS[status] || "Unknown",
+    tone: status === 3 ? "good" : status === 4 ? "bad" : status === 1 || status === 2 ? "live" : "muted",
+    commits: data[offset + 1],
+    reveals: data[offset + 2],
+    committee,
+    threshold: Math.floor(committee / 2) + 1,
+  };
+}
+
+export async function latestRound() {
+  const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
+  const info = await readAccount(config);
+  if (!info) throw new Error("The protocol config is missing on devnet.");
+  const id = readTaskCount(info.data);
+  if (id === 0n) return null;
+  return readRound(id);
+}
+
 export function committeeNodes() {
   return NODE_OWNERS.map(
     (owner) =>

@@ -7,6 +7,7 @@ import {
   sendSigned,
   solToLamports,
 } from "./requestTask.js";
+import RoundStatus from "./RoundStatus.jsx";
 import { useWallet } from "./wallet.jsx";
 
 const SIZES = [3, 5, 7, 9, 11];
@@ -194,12 +195,15 @@ export default function LaunchForm() {
             <p>Connect a Devnet wallet to sign.</p>
           )}
           {result && (
-            <p>
-              Task {result.id} is open.{" "}
-              <a href={explorerTx(result.signature)} target="_blank" rel="noreferrer">
-                View the transaction
-              </a>
-            </p>
+            <>
+              <p>
+                Task {result.id} is on devnet.{" "}
+                <a href={explorerTx(result.signature)} target="_blank" rel="noreferrer">
+                  View the transaction
+                </a>
+              </p>
+              <RoundStatus taskId={result.id} label="This round" compact />
+            </>
           )}
           {error && <p className="form-error">{error}</p>}
         </div>

@@ -114,7 +114,7 @@
 - [x] Wallet connect (Phantom/Solflare, devnet)
 - [ ] Function registration UI (wasm hash input)
 - [x] Task launch UI (input parameters, reward, **committee size selector 3/5/7/9/11**). The connected wallet signs `request_task` on devnet. Only N=3 can be submitted; three nodes are staked
-- [ ] Live status: Requested → Committed (x/N) → Revealed (x/N) → Finalized/Failed
+- [x] Live status: Requested → Committed (x/N) → Revealed (x/N) → Finalized/Failed. The home page reads the latest task from devnet and refreshes until it settles
 - [ ] Node list: stake, status, last activity
 - [x] Slashing visual on the hero round (node 3 pulses). A full history indicator is still open
 - [x] Transaction links (Solana Explorer, devnet)

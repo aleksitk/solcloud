@@ -258,6 +258,81 @@ h1 {
   padding: 28px 0 96px;
 }
 
+.live-note {
+  margin: 0 0 28px;
+  color: #c4b6d4;
+}
+
+.live-round {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 36px;
+  padding: 22px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.live-round .kicker {
+  margin-bottom: 10px;
+}
+
+.live-round h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.live-round p {
+  margin: 12px 0 0;
+  color: #c4b6d4;
+  line-height: 1.5;
+}
+
+.live-round a {
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 10px;
+  border-radius: 99px;
+  background: #c4b6d4;
+  vertical-align: 3px;
+}
+
+.live-dot.good {
+  background: #14f195;
+}
+
+.live-dot.bad {
+  background: #ff8d8d;
+}
+
+.live-dot.live {
+  background: #14f195;
+  box-shadow: 0 0 0 0 rgba(20, 241, 149, 0.7);
+  animation: ping 1.8s ease-out infinite;
+}
+
+.live-round.compact {
+  display: block;
+  margin: 18px 0 0;
+}
+
+.live-round.compact a {
+  display: inline-block;
+  margin-top: 16px;
+}
+
 .ledger-head {
   display: flex;
   align-items: baseline;
@@ -550,7 +625,8 @@ h1 {
     width: min(1120px, calc(100% - 32px));
   }
 
-  .header-row {
+  .header-row,
+  .live-round {
     flex-wrap: wrap;
   }
 

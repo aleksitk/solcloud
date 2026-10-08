@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Aurora from "./Aurora.jsx";
 import LaunchForm from "./LaunchForm.jsx";
+import RoundStatus from "./RoundStatus.jsx";
 import WalletButton from "./WalletButton.jsx";
 
 const PROGRAM_ID = "D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ";
@@ -146,6 +147,7 @@ export default function App() {
       </section>
 
       <section className="shell below">
+        <RoundStatus />
         <div className="ledger-head">
           <h2>Settled rounds</h2>
           <span>Devnet · {proofs.length}</span>
