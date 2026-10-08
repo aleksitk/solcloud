@@ -52,91 +52,74 @@ export default function FunctionView({ onUse }) {
   }
 
   return (
-    <section className="shell launch">
+    <section className="shell launch fn-page">
       <p className="kicker">Functions</p>
-      <h1>The program nodes run.</h1>
-      <p className="lede">
-        A task names a Wasm program by its SHA-256. Nodes check the file against that hash, then run it.
-        The labyrinth is built in. A second function can be compiled here.
-      </p>
+      <h1>Write the program.</h1>
+      <p className="lede">Integers only. Export alloc and run. The hash is what the next task stores.</p>
 
-      <article className="fn-card">
-        <header className="fn-head">
-          <h2>Labyrinth</h2>
-          <span>Registered</span>
-        </header>
-        <p>
-          Shortest path through a perfect maze. Integer arithmetic only, so every node that runs this
-          hash gets the same path.
-        </p>
-        <label className="hash-field">
-          Wasm hash
-          <textarea
-            readOnly
-            rows={1}
-            value={WASM_HASH}
-            spellCheck={false}
-            onFocus={(event) => event.target.select()}
-          />
-        </label>
-        <div className="fn-actions">
-          <button type="button" className="path-open" onClick={copyHash}>
-            {copied ? "Copied" : "Copy hash"}
-          </button>
-          <button
-            type="button"
-            className="submit fn-use"
-            onClick={() => {
-              chooseLabyrinth();
-              onUse();
-            }}
-          >
-            Use for a new task
-          </button>
-        </div>
-        <dl className="fn-spec">
-          <div>
-            <dt>Input</dt>
-            <dd>Seed as u64, size as u32</dd>
-          </div>
-          <div>
-            <dt>Output</dt>
-            <dd>Path length and path hash, 12 bytes</dd>
-          </div>
-        </dl>
-      </article>
-
-      <article className="fn-card">
-        <header className="fn-head">
-          <h2>Your function</h2>
-          <span>{compiled ? "Compiled" : "AssemblyScript"}</span>
-        </header>
-        <p>Integers only. Export alloc and run. Input and output stay within 64 bytes.</p>
-        <textarea
-          className="fn-source"
-          value={source}
-          spellCheck={false}
-          onChange={(event) => setSource(event.target.value)}
-          aria-label="AssemblyScript source"
-        />
-        <div className="fn-actions">
-          <button type="button" className="submit fn-use" onClick={compile} disabled={compiling}>
-            {compiling ? "Compiling…" : "Compile"}
-          </button>
-          {compiled ? (
-            <button type="button" className="path-open" onClick={onUse}>
-              Use for a new task
+      <div className="fn-workspace">
+        <section className="fn-editor" aria-label="AssemblyScript editor">
+          <header className="fn-editor-bar">
+            <span className="fn-file">function.ts</span>
+            <span className={compiled ? "fn-state on" : "fn-state"}>{compiled ? "Compiled" : "Draft"}</span>
+            <button type="button" className="submit fn-use" onClick={compile} disabled={compiling}>
+              {compiling ? "Compiling…" : "Compile"}
             </button>
+          </header>
+          <textarea
+            className="fn-source"
+            value={source}
+            spellCheck={false}
+            onChange={(event) => setSource(event.target.value)}
+            aria-label="AssemblyScript source"
+          />
+          {error ? <pre className="fn-error">{error}</pre> : null}
+          {compiled ? (
+            <footer className="fn-editor-foot">
+              <div>
+                <span>Wasm hash</span>
+                <code>{compiled.hash}</code>
+              </div>
+              <button type="button" className="path-open" onClick={onUse}>
+                Use for a new task
+              </button>
+            </footer>
           ) : null}
-        </div>
-        {error ? <pre className="fn-error">{error}</pre> : null}
-        {compiled ? (
+        </section>
+
+        <aside className="fn-card fn-side">
+          <header className="fn-head">
+            <h2>Labyrinth</h2>
+            <span>Built in</span>
+          </header>
+          <p>Already registered. Seed and size in, path length and hash out.</p>
           <label className="hash-field">
             Wasm hash
-            <textarea readOnly rows={2} value={compiled.hash} spellCheck={false} onFocus={(event) => event.target.select()} />
+            <textarea
+              readOnly
+              rows={3}
+              value={WASM_HASH}
+              spellCheck={false}
+              onFocus={(event) => event.target.select()}
+            />
           </label>
-        ) : null}
-      </article>
+          <div className="fn-actions">
+            <button type="button" className="path-open" onClick={copyHash}>
+              {copied ? "Copied" : "Copy hash"}
+            </button>
+            <button
+              type="button"
+              className="submit fn-use"
+              onClick={() => {
+                chooseLabyrinth();
+                onUse();
+              }}
+            >
+              Use for a new task
+            </button>
+          </div>
+        </aside>
+      </div>
     </section>
   );
 }
