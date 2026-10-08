@@ -372,7 +372,7 @@ h1 {
 .sheet-head,
 .sheet-row {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1.5fr) 110px 150px 88px;
+  grid-template-columns: 72px minmax(0, 1.5fr) 120px 150px 88px;
   gap: 12px;
   align-items: center;
   padding: 14px 18px;
@@ -410,6 +410,19 @@ h1 {
   font-family: var(--font-mono);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+}
+
+.agree b {
+  display: block;
+  font-weight: 400;
+}
+
+.agree em {
+  display: block;
+  margin-top: 3px;
+  color: #c4b6d4;
+  font-size: 11px;
+  font-style: normal;
 }
 
 .status {

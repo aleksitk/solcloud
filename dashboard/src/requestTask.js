@@ -108,10 +108,10 @@ export function describeRound(round) {
     return `${round.reveals} of ${size} revealed. ${need} of ${size} must agree.`;
   }
   if (round.status === "Finalized") {
-    return `${round.reveals} of ${size} revealed. The majority was paid.`;
+    return `${round.reveals} of ${size} revealed. ${need} of ${size} was enough.`;
   }
   if (round.status === "Refunded") {
-    return "The reward returned to the requester.";
+    return `The reward returned to the requester. ${need} of ${size} had to agree.`;
   }
   if (round.status === "Failed") {
     return "The round failed before a result was stored.";

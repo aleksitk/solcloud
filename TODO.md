@@ -120,7 +120,7 @@
 - [x] Transaction links (Solana Explorer, devnet)
 - [ ] Consumer dApp visualization (e.g. labyrinth map + path)
 - [ ] Responsive, polished UI for presentation
-- [ ] Show committee size + threshold clearly per task (e.g. "6 of 11 agreed")
+- [x] Show committee size + threshold clearly per task (e.g. "3 of 3", need 2). The settled list and the latest-round card both show it
 
 ---
 
