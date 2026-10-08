@@ -482,12 +482,44 @@ export async function readNodeHistory(owner) {
 }
 
 const COMMITTEE_SIZES = [3, 5, 7, 9, 11];
+const SPEED_LABEL = ["Fast", "Standard", "Slow"];
+
+// Top, middle, and bottom thirds. Faster is a lower average. No fixed cutoff.
+export function speedBucket(index, count) {
+  if (index < Math.ceil(count / 3)) return 0;
+  if (index < Math.ceil((2 * count) / 3)) return 1;
+  return 2;
+}
+
+export function assignSpeed(nodes) {
+  const ranked = nodes
+    .filter((node) => node.averageSeconds != null)
+    .sort((left, right) => left.averageSeconds - right.averageSeconds || left.id.localeCompare(right.id));
+  const assigned = new Map();
+  let previousSeconds = null;
+  let previousBucket = 0;
+  ranked.forEach((node, index) => {
+    let bucket = speedBucket(index, ranked.length);
+    if (previousSeconds != null && node.averageSeconds === previousSeconds) bucket = previousBucket;
+    previousSeconds = node.averageSeconds;
+    previousBucket = bucket;
+    assigned.set(node.owner, bucket);
+  });
+  return nodes.map((node) => {
+    const bucket = assigned.has(node.owner) ? assigned.get(node.owner) : null;
+    return {
+      ...node,
+      speed: bucket == null ? "—" : SPEED_LABEL[bucket],
+      speedRank: bucket,
+    };
+  });
+}
 
 export async function readNodeBrowser() {
   const nodes = (await readNodes()).filter((node) => node.status === "Active");
   const sizes = COMMITTEE_SIZES.filter((size) => size <= nodes.length);
   const grouped = await loadCommitRows(nodes.map((node) => node.owner));
-  return nodes.map((node) => {
+  const withAverage = nodes.map((node) => {
     const seconds = meanReveal(grouped.get(node.owner) || []);
     return {
       ...node,
@@ -497,6 +529,7 @@ export async function readNodeBrowser() {
       averageSeconds: seconds,
     };
   });
+  return assignSpeed(withAverage);
 }
 
 function successOf(completed, slashed) {

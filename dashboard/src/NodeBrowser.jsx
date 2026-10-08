@@ -5,6 +5,7 @@ const COLUMNS = [
   { key: "node", label: "Node" },
   { key: "success", label: "Success" },
   { key: "average", label: "Average" },
+  { key: "speed", label: "Speed" },
   { key: "stake", label: "Stake" },
   { key: "sizes", label: "Sizes" },
 ];
@@ -16,6 +17,7 @@ function explorerAddress(address) {
 function missing(node, key) {
   if (key === "success") return node.successRank == null;
   if (key === "average") return node.averageSeconds == null;
+  if (key === "speed") return node.speedRank == null;
   return false;
 }
 
@@ -23,6 +25,7 @@ function compare(left, right, key) {
   if (key === "node") return left.id.localeCompare(right.id);
   if (key === "success") return (left.successRank ?? 0) - (right.successRank ?? 0);
   if (key === "average") return (left.averageSeconds ?? 0) - (right.averageSeconds ?? 0);
+  if (key === "speed") return (left.speedRank ?? 0) - (right.speedRank ?? 0);
   if (key === "stake") {
     if (left.stake === right.stake) return 0;
     return left.stake > right.stake ? 1 : -1;
@@ -81,7 +84,7 @@ export default function NodeBrowser() {
       <p className="kicker">Network</p>
       <h1>Nodes.</h1>
       <p className="lede">
-        Every active node. Success is completed tasks over completed plus slashed. Average is the mean reveal time on finalized rounds. Sizes are the committees this node can be drawn into.
+        Every active node. Success is completed tasks over completed plus slashed. Average is the mean reveal time on finalized rounds. Speed is the top, middle, or bottom third by that average. Sizes are the committees this node can be drawn into.
       </p>
 
       {!nodes ? (
@@ -116,6 +119,7 @@ export default function NodeBrowser() {
                 <span className="row-meta">
                   <span className={node.success.endsWith("%") ? "mono" : "words"}>{node.success}</span>
                   <span className="mono">{node.average}</span>
+                  <span className="mono">{node.speed}</span>
                   <span className="mono">{node.stakeText} SOL</span>
                   <span className="mono">{node.sizesText}</span>
                   <span className="go">Explorer</span>
@@ -124,7 +128,7 @@ export default function NodeBrowser() {
             ))}
           </div>
           <p className="hint">
-            A node joins a committee of 3, 5, 7, 9, or 11 when at least that many nodes are active. Older rounds have no reveal time, and the success counters are still zero on devnet, so those columns stay blank.
+            A node joins a committee of 3, 5, 7, 9, or 11 when at least that many nodes are active. Speed has no fixed cutoff. A node with no reveal time is left out of the thirds, so that column stays blank on the rounds already on devnet.
           </p>
         </>
       )}
