@@ -115,7 +115,7 @@
 - [ ] Function registration UI (wasm hash input)
 - [x] Task launch UI (input parameters, reward, **committee size selector 3/5/7/9/11**). The connected wallet signs `request_task` on devnet. Only N=3 can be submitted; three nodes are staked
 - [x] Live status: Requested → Committed (x/N) → Revealed (x/N) → Finalized/Failed. The home page reads the latest task from devnet and refreshes until it settles
-- [ ] Node list: stake, status, last activity
+- [x] Node list: stake and status, read from the three devnet node accounts. Last activity is not stored on the node, so it is not shown
 - [x] Slashing visual on the hero round (node 3 pulses). A full history indicator is still open
 - [x] Transaction links (Solana Explorer, devnet)
 - [ ] Consumer dApp visualization (e.g. labyrinth map + path)

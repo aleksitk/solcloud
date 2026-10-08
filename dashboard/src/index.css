@@ -353,6 +353,15 @@ h1 {
   color: #c4b6d4;
 }
 
+.ledger-follow {
+  margin-top: 42px;
+}
+
+.sheet-head.nodes-head,
+.sheet-row.nodes-row {
+  grid-template-columns: 88px minmax(0, 1.5fr) 150px 88px;
+}
+
 .sheet {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);

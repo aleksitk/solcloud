@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Aurora from "./Aurora.jsx";
 import LaunchForm from "./LaunchForm.jsx";
+import NodeList from "./NodeList.jsx";
 import RoundStatus from "./RoundStatus.jsx";
 import WalletButton from "./WalletButton.jsx";
 
@@ -176,6 +177,7 @@ export default function App() {
             </a>
           ))}
         </div>
+        <NodeList />
       </section>
       </>
       )}

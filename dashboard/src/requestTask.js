@@ -144,6 +144,39 @@ export async function readRound(taskId) {
   };
 }
 
+function solText(lamports) {
+  const whole = lamports / 1_000_000_000n;
+  const frac = (lamports % 1_000_000_000n).toString().padStart(9, "0").slice(0, 3);
+  return `${whole.toString()}.${frac}`;
+}
+
+const NODE_STATUS = ["Active", "Inactive", "Slashed"];
+
+export async function readNodes() {
+  const nodes = [];
+  for (let index = 0; index < NODE_OWNERS.length; index++) {
+    const owner = new PublicKey(NODE_OWNERS[index]);
+    const [pda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("node"), owner.toBuffer()],
+      PROGRAM_ID
+    );
+    const info = await readAccount(pda);
+    if (!info) continue;
+    const data = Buffer.from(info.data);
+    const stake = data.readBigUInt64LE(40);
+    const status = data[48];
+    nodes.push({
+      id: String(index + 1).padStart(2, "0"),
+      address: pda.toBase58(),
+      status: NODE_STATUS[status] || "Unknown",
+      tone: status === 2 ? "bad" : status === 0 ? "good" : "muted",
+      stakeText: solText(stake),
+      reduced: stake < 1_000_000_000n,
+    });
+  }
+  return nodes;
+}
+
 export async function latestRound() {
   const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
   const info = await readAccount(config);
