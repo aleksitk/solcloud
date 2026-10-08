@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Aurora from "./Aurora.jsx";
 import LaunchForm from "./LaunchForm.jsx";
+import { MazeSummary, MazeView } from "./MazePath.jsx";
 import NodeList from "./NodeList.jsx";
 import RoundHistory from "./RoundHistory.jsx";
 import RoundStatus from "./RoundStatus.jsx";
@@ -56,6 +57,8 @@ export default function App() {
 
       {view === "launch" ? (
         <LaunchForm />
+      ) : view === "map" ? (
+        <MazeView onClose={() => setView("home")} />
       ) : (
       <>
       <section className="hero">
@@ -102,6 +105,7 @@ export default function App() {
 
       <section className="shell below">
         <RoundStatus />
+        <MazeSummary onOpen={() => setView("map")} />
         <RoundHistory />
         <NodeList />
       </section>

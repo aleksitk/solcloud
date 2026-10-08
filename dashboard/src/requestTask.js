@@ -123,6 +123,8 @@ function parseTask(raw, taskId, task) {
   const data = Uint8Array.from(raw);
   const view = new DataView(data.buffer);
   const inputLen = view.getUint32(72, true);
+  const seed = inputLen >= 12 ? view.getBigUint64(76, true) : null;
+  const mazeSize = inputLen >= 12 ? view.getUint32(84, true) : null;
   let offset = 76 + inputLen + 8;
   const committee = data[offset];
   offset += 1;
@@ -135,6 +137,8 @@ function parseTask(raw, taskId, task) {
     status: ROUND_STATUS[status] || "Unknown",
     commits: data[offset + 1],
     reveals: data[offset + 2],
+    seed,
+    mazeSize,
     committee,
     threshold: Math.floor(committee / 2) + 1,
   };

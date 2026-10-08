@@ -118,7 +118,7 @@
 - [x] Node list: stake and status, read from the three devnet node accounts. Last activity is not stored on the node, so it is not shown
 - [x] Slashing visual on the hero round (node 3 pulses). Settled rounds, including the slash and the refunds, are read from devnet
 - [x] Transaction links (Solana Explorer, devnet)
-- [ ] Consumer dApp visualization (e.g. labyrinth map + path)
+- [x] Consumer path for the latest maze round. The home page keeps a labeled row; Open map shows the entrance and exit on their own view. Length 35628 matches the nodes
 - [x] Responsive layout for a phone-width screen: header, hero, round rows, and the task form
 - [x] Show committee size + threshold clearly per task (e.g. "3 of 3", need 2). The settled list and the latest-round card both show it
 
