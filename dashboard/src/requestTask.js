@@ -146,12 +146,15 @@ function parseTask(raw, taskId, task) {
   const committeeLen = view.getUint32(offset, true);
   offset += 4 + committeeLen * 32;
   const status = data[offset];
+  const createdAt = offset + 11 <= data.length ? Number(view.getBigInt64(offset + 3, true)) : 0;
+  const storedId = offset + 35 <= data.length ? view.getBigUint64(offset + 27, true) : taskId;
   return {
-    id: taskId.toString().padStart(2, "0"),
+    id: storedId.toString().padStart(2, "0"),
     address: task.toBase58(),
     status: ROUND_STATUS[status] || "Unknown",
     commits: data[offset + 1],
     reveals: data[offset + 2],
+    createdAt,
     seed,
     mazeSize,
     wasmHash,
@@ -166,13 +169,15 @@ function parseResult(raw) {
   const view = new DataView(data.buffer);
   const outputLen = view.getUint32(40, true);
   if (44 + outputLen > data.length) return null;
-  const offset = 44 + outputLen + 32;
+  const hashAt = 44 + outputLen;
+  const offset = hashAt + 32;
   const names = ["Finalized", "Failed", "Refunded"];
   return {
     status: names[data[offset]] || "Unknown",
     agreed: data[offset + 1],
     committee: data[offset + 2],
     output: hexBytes(data.subarray(44, 44 + outputLen)),
+    outputHash: hexBytes(data.subarray(hashAt, hashAt + 32)),
   };
 }
 
@@ -278,6 +283,105 @@ export async function readMinStake() {
   const info = await readAccount(config);
   if (!info) throw new Error("The protocol config is missing on devnet.");
   return Buffer.from(info.data).readBigUInt64LE(72);
+}
+
+function parseCommit(raw) {
+  const data = Buffer.from(raw);
+  if (data.length < 170) return null;
+  const outputLen = data.readUInt32LE(136);
+  let cursor = 140 + outputLen;
+  if (cursor + 18 > data.length) return null;
+  cursor += 8;
+  const revealed = data[cursor] === 1;
+  cursor += 1 + 8 + 1;
+  const revealedAt = cursor + 8 <= data.length ? data.readBigInt64LE(cursor) : 0n;
+  return {
+    task: new PublicKey(data.subarray(8, 40)).toBase58(),
+    outputHash: hexBytes(data.subarray(104, 136)),
+    revealed,
+    revealedAt,
+  };
+}
+
+function revealTime(createdAt, revealedAt) {
+  if (!createdAt || revealedAt <= 0n) return "—";
+  const seconds = Number(revealedAt) - createdAt;
+  if (!Number.isFinite(seconds) || seconds < 0) return "—";
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+function nodeOutcome(task, commit, result) {
+  if (task.status === "Finalized" && result?.status === "Finalized") {
+    if (commit.revealed && commit.outputHash === result.outputHash) {
+      return { outcome: "Won", tone: "good" };
+    }
+    return { outcome: "Slashed", tone: "bad" };
+  }
+  if (task.status === "Refunded" || result?.status === "Refunded") {
+    if (task.reveals >= task.committee) return { outcome: "No majority", tone: "muted" };
+    return { outcome: "Timed out", tone: "muted" };
+  }
+  return { outcome: "Open", tone: "live" };
+}
+
+export async function readNodeHistory(owner) {
+  const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
+  const configInfo = await readAccount(config);
+  if (!configInfo) throw new Error("The protocol config is missing on devnet.");
+  const count = Number(readTaskCount(configInfo.data));
+  if (!count) return [];
+
+  const ownerKey = new PublicKey(owner);
+  const tasks = [];
+  const commitKeys = [];
+  for (let id = 1; id <= count; id += 1) {
+    const task = taskPda(BigInt(id));
+    tasks.push(task);
+    commitKeys.push(
+      PublicKey.findProgramAddressSync(
+        [Buffer.from("commit"), task.toBuffer(), ownerKey.toBuffer()],
+        PROGRAM_ID
+      )[0]
+    );
+  }
+
+  const commitInfos = await withRetries(() => connection.getMultipleAccountsInfo(commitKeys));
+  const present = [];
+  for (let index = 0; index < commitInfos.length; index += 1) {
+    if (!commitInfos[index]) continue;
+    const commit = parseCommit(commitInfos[index].data);
+    if (commit) present.push({ index, commit });
+  }
+  if (!present.length) return [];
+
+  const taskKeys = present.map((row) => tasks[row.index]);
+  const taskInfos = await withRetries(() => connection.getMultipleAccountsInfo(taskKeys));
+  const resultKeys = taskKeys.map(
+    (task) => PublicKey.findProgramAddressSync([Buffer.from("result"), task.toBuffer()], PROGRAM_ID)[0]
+  );
+  const resultInfos = await withRetries(() => connection.getMultipleAccountsInfo(resultKeys));
+
+  const rows = [];
+  for (let index = 0; index < present.length; index += 1) {
+    if (!taskInfos[index]) continue;
+    const task = parseTask(taskInfos[index].data, BigInt(present[index].index + 1), taskKeys[index]);
+    const result = parseResult(resultInfos[index]?.data);
+    const verdict = nodeOutcome(task, present[index].commit, result);
+    rows.push({
+      id: task.id,
+      address: task.address,
+      committee: task.committee,
+      time: revealTime(task.createdAt, present[index].commit.revealedAt),
+      ...verdict,
+    });
+  }
+  rows.sort((a, b) => b.id.localeCompare(a.id));
+  return rows;
 }
 
 export async function findNode(owner) {

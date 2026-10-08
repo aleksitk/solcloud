@@ -1869,6 +1869,11 @@ h2,
   color: #0b7a4b;
 }
 
+.mine-history {
+  max-width: 720px;
+  margin-top: 28px;
+}
+
 @media (max-width: 800px) {
   .mine-stats {
     grid-template-columns: 1fr 1fr;

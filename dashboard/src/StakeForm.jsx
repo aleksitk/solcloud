@@ -7,6 +7,7 @@ import {
   sendSigned,
   solToLamports,
 } from "./requestTask.js";
+import NodeHistory from "./NodeHistory.jsx";
 import { useWallet } from "./wallet.jsx";
 
 function solLabel(lamports) {
@@ -177,6 +178,8 @@ export default function StakeForm() {
           </button>
         </form>
       )}
+
+      {existing ? <NodeHistory owner={wallet.address} /> : null}
 
       {review && !existing && (
         <div className="review">
