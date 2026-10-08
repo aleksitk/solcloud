@@ -70,7 +70,7 @@ export default function App() {
             <button type="button" className={view === "functions" ? "on" : ""} onClick={() => setView("functions")}>
               Functions
             </button>
-            <button type="button" className={view === "launch" ? "on" : ""} onClick={() => setView("launch")}>
+            <button type="button" className={view === "compute" ? "on" : ""} onClick={() => setView("compute")}>
               New task
             </button>
             <button type="button" className={view === "stake" ? "on" : ""} onClick={() => setView("stake")}>
@@ -87,14 +87,17 @@ export default function App() {
       </header>
 
       <main className="page" key={view}>
-      {view === "launch" ? (
-        <LaunchForm onOpenFunction={() => setView("functions")} />
+      {view === "compute" ? (
+        <>
+          <LaunchForm onOpenFunction={() => setView("functions")} />
+          <NodeBrowser />
+        </>
       ) : view === "nodes" ? (
         <NodeBrowser />
       ) : view === "stake" ? (
         <StakeForm />
       ) : view === "functions" ? (
-        <FunctionView onUse={() => setView("launch")} />
+        <FunctionView onUse={() => setView("compute")} />
       ) : view === "map" ? (
         <MazeView onClose={() => setView("home")} />
       ) : (
@@ -191,14 +194,14 @@ export default function App() {
       <section className="shell close">
         <div>
           <p className="kicker">Start</p>
-          <h2>Escrow a round, or stake a node.</h2>
+          <h2>Rent out a machine, or run a computation.</h2>
         </div>
         <div className="close-actions">
-          <button type="button" className="submit" onClick={() => setView("launch")}>
-            New task
+          <button type="button" className="submit" onClick={() => setView("compute")}>
+            Run a computation
           </button>
           <button type="button" className="close-ghost" onClick={() => setView("stake")}>
-            Stake
+            Rent out your hardware
           </button>
         </div>
       </section>

@@ -138,7 +138,7 @@ Two paths on the site that already exists. No new instruction beyond the three m
 - [x] My Requests: tasks this wallet created, on the task page. Each row is a task id, status, the reward still stored on the task, and a link to the result account when one exists. A settled task stores 0 because the reward was paid or returned
 - [x] Node browser: every active node, on its own page. Columns are success rate, average completion time, stake, and the committee sizes that node can be drawn into (3, 5, 7, 9, or 11, when at least that many nodes are active). Each column sorts. Success stays “None yet” and average stays blank until those fields exist on settled rounds
 - [x] Speed class (fast, standard, slow) is a third of the active nodes by completion time: top, middle, bottom. Shown on the node browser. Nodes with no reveal time are left out, so the column stays blank on current devnet rounds. No fixed millisecond cutoff
-- [ ] Homepage: "Rent out your hardware" opens registration and My Node. "Run a computation" opens the task form, the node browser, and My Requests. Two routes, not a new layout
+- [x] Homepage: "Rent out your hardware" opens the stake page, which is registration or My Node. "Run a computation" opens the task form, My Requests, and the node browser. Two routes through the pages that already exist
 
 ---
 
