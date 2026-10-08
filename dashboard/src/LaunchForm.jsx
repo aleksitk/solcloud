@@ -13,6 +13,7 @@ import {
   sendSigned,
   solToLamports,
 } from "./requestTask.js";
+import MyRequests from "./MyRequests.jsx";
 import RoundStatus from "./RoundStatus.jsx";
 import { useFunctionChoice } from "./functionChoice.jsx";
 import { useWallet } from "./wallet.jsx";
@@ -357,6 +358,8 @@ export default function LaunchForm({ onOpenFunction }) {
           {error && <p className="form-error">{error}</p>}
         </div>
       )}
+
+      <MyRequests owner={wallet.address} refreshKey={result?.id || ""} />
     </section>
   );
 }

@@ -1874,6 +1874,20 @@ h2,
   margin-top: 28px;
 }
 
+.my-requests {
+  max-width: 720px;
+  margin-top: 36px;
+}
+
+.my-requests .sheet-head,
+.my-requests .sheet-row {
+  grid-template-columns: 72px minmax(0, 1.4fr) 120px 88px;
+}
+
+.my-requests .hint {
+  margin-top: 12px;
+}
+
 .env-check {
   max-width: 720px;
   margin-top: 28px;

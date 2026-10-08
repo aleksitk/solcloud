@@ -140,7 +140,9 @@ function parseTask(raw, taskId, task) {
   const inputLen = view.getUint32(72, true);
   const seed = inputLen >= 12 ? view.getBigUint64(76, true) : null;
   const mazeSize = inputLen >= 12 ? view.getUint32(84, true) : null;
-  let offset = 76 + inputLen + 8;
+  const rewardAt = 76 + inputLen;
+  const reward = rewardAt + 8 <= data.length ? view.getBigUint64(rewardAt, true) : 0n;
+  let offset = rewardAt + 8;
   const committee = data[offset];
   offset += 1;
   const committeeLen = view.getUint32(offset, true);
@@ -158,6 +160,8 @@ function parseTask(raw, taskId, task) {
     seed,
     mazeSize,
     wasmHash,
+    requester: new PublicKey(data.subarray(8, 40)).toBase58(),
+    reward,
     committee,
     threshold: Math.floor(committee / 2) + 1,
   };
@@ -204,6 +208,52 @@ function settledView(task, result) {
     };
   }
   return { status: "Failed", title: "Round failed", agreement, effect: "—", tone: "bad" };
+}
+
+export async function readMyRequests(owner) {
+  const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
+  const configInfo = await readAccount(config);
+  if (!configInfo) throw new Error("The protocol config is missing on devnet.");
+  const count = Number(readTaskCount(configInfo.data));
+  if (!count) return [];
+
+  const ids = [];
+  const tasks = [];
+  for (let id = 1; id <= count; id += 1) {
+    ids.push(BigInt(id));
+    tasks.push(taskPda(BigInt(id)));
+  }
+  const taskInfos = await withRetries(() => connection.getMultipleAccountsInfo(tasks));
+  const mine = [];
+  for (let index = 0; index < taskInfos.length; index += 1) {
+    if (!taskInfos[index]) continue;
+    const task = parseTask(taskInfos[index].data, ids[index], tasks[index]);
+    if (task.requester !== owner) continue;
+    mine.push(task);
+  }
+  if (!mine.length) return [];
+
+  const resultKeys = mine.map(
+    (task) =>
+      PublicKey.findProgramAddressSync(
+        [Buffer.from("result"), new PublicKey(task.address).toBuffer()],
+        PROGRAM_ID
+      )[0]
+  );
+  const resultInfos = await withRetries(() => connection.getMultipleAccountsInfo(resultKeys));
+  const rows = mine.map((task, index) => {
+    const live = task.status === "Requested" || task.status === "Committing" || task.status === "Revealing";
+    return {
+      id: task.id,
+      address: task.address,
+      status: task.status,
+      reward: task.reward,
+      tone: task.status === "Finalized" ? "good" : task.status === "Failed" ? "bad" : live ? "live" : "muted",
+      result: resultInfos[index] ? resultKeys[index].toBase58() : null,
+    };
+  });
+  rows.sort((a, b) => b.id.localeCompare(a.id));
+  return rows;
 }
 
 export async function readRound(taskId) {
