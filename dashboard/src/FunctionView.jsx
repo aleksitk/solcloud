@@ -48,7 +48,9 @@ export default function CodeEditor() {
         body: JSON.stringify({ source }),
       });
       // The published site is static. Only the local dev server has /api/compile.
-      if (response.status === 404) {
+      // A static host answers an unknown path with 404, or with the page itself.
+      const isJson = (response.headers.get("content-type") || "").includes("application/json");
+      if (response.status === 404 || !isJson) {
         throw new Error("This site cannot compile. Build the .wasm with asc and use Upload .wasm.");
       }
       const body = await response.json();
