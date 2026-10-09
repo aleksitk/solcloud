@@ -1503,6 +1503,11 @@ h1 {
     grid-template-columns: 48px minmax(0, 1fr);
   }
 
+  .sheet-row.nodes-row,
+  .browser .sheet-row {
+    grid-template-columns: 108px minmax(0, 1fr);
+  }
+
   .row-meta {
     display: flex;
     flex-wrap: wrap;
@@ -1814,7 +1819,7 @@ h2,
 
 .panel .sheet-head.nodes-head,
 .panel .sheet-row.nodes-row {
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 108px minmax(0, 1fr) auto;
 }
 
 .panel .nodes-head span:last-child,
@@ -1897,7 +1902,7 @@ h2,
 
 .browser .sheet-head,
 .browser .sheet-row {
-  grid-template-columns: 108px 110px 100px 110px 130px minmax(48px, 1fr) 88px;
+  grid-template-columns: 120px 110px 100px 110px 130px minmax(48px, 1fr) 88px;
 }
 
 .browser .sheet-row > .mono {

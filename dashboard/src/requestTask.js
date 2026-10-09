@@ -24,13 +24,6 @@ function hexBytes(bytes) {
   return hex;
 }
 
-// Public owner keys of the three nodes already staked on devnet.
-const NODE_OWNERS = [
-  "GXD26Q35NjyUiWu93rVU8iQzm3vfU7pTSYXyZDrcvq3d",
-  "CVxAsXthJSZezHGNmLzeFjaV49CGEuHBHjMUnBoxr97n",
-  "5czt2hE9Xn5UFqQvGEkgwF8FqCjDn8MLhofMRE7ShUgb",
-];
-
 const connection = new Connection(RPC, "confirmed");
 
 function concat(parts) {
@@ -611,7 +604,6 @@ export function readNodes() {
 
 async function loadNodes() {
   const accounts = await nodeAccounts();
-  const known = new Map(NODE_OWNERS.map((owner, index) => [owner, index]));
   const nodes = accounts.map(({ pubkey, account }) => {
     const data = Buffer.from(account.data);
     const owner = new PublicKey(data.subarray(8, 40)).toBase58();
@@ -620,11 +612,9 @@ async function loadNodes() {
     const reputation = data.readBigInt64LE(49);
     const completed = data.length >= 65 ? data.readBigUInt64LE(57) : 0n;
     const slashed = data.length >= 74 ? data.readBigUInt64LE(66) : 0n;
-    const order = known.get(owner);
     return {
-      id: order === undefined ? shortOwner(owner) : String(order + 1).padStart(2, "0"),
+      id: shortOwner(owner),
       owner,
-      order: order === undefined ? 1000 : order,
       address: pubkey.toBase58(),
       status: NODE_STATUS[status] || "Unknown",
       reputation,
@@ -635,7 +625,7 @@ async function loadNodes() {
       ...successOf(completed, slashed),
     };
   });
-  nodes.sort((a, b) => a.order - b.order || a.owner.localeCompare(b.owner));
+  nodes.sort((a, b) => a.owner.localeCompare(b.owner));
   return nodes;
 }
 

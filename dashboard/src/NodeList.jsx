@@ -55,7 +55,7 @@ export default function NodeList() {
         </div>
         {nodes.map((node) => (
           <a
-            key={node.id}
+            key={node.address}
             className="sheet-row nodes-row"
             href={explorerAddress(node.address)}
             target="_blank"
