@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: solcloud
+    runtime: static
+    rootDir: dashboard
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
