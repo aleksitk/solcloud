@@ -19,7 +19,7 @@ const PROGRAM_ID = new PublicKey("D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ")
 const RPC = "https://api.devnet.solana.com";
 const TASK_ID = BigInt(process.argv[2] || "3");
 const REWARD = 50_000_000n; // 0.05 SOL
-const WASM_SHA256 = "52d0b49e663d826e92598ff7c0939b2c26804026c750d3cfa92a3dd3986686f6";
+const WASM_SHA256 = "ee0b3e4c3ede257e3719c52deee27528ea791218cdea3a5802fd52bf9ce5057a";
 
 function discriminator(name) {
   return crypto.createHash("sha256").update(`global:${name}`).digest().subarray(0, 8);
@@ -122,7 +122,7 @@ async function main() {
     if (registry.length < 3) {
       throw new Error(`Only ${registry.length} nodes are in the on-chain registry.`);
     }
-    seedSlot = await connection.getSlot("processed");
+    seedSlot = await connection.getSlot("confirmed");
     const picked = selectCommittee(registry, 3, seedSlot, TASK_ID);
     nodeAccounts = picked.map((owner) => {
       const [pda] = PublicKey.findProgramAddressSync(

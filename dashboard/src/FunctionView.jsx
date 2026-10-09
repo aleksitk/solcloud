@@ -37,6 +37,10 @@ export default function FunctionView({ onUse }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ source }),
       });
+      // The published site is static. Only the local dev server has /api/compile.
+      if (response.status === 404) {
+        throw new Error("Compile runs on the local dev server. Start it with npm run dev in dashboard/.");
+      }
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Compile failed.");
       chooseCompiled({

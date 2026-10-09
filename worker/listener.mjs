@@ -1,50 +1,42 @@
-// One node, one process. Polls devnet and commits, then reveals, its own tasks.
+// One node, one process. Polls devnet, commits and reveals its own tasks,
+// then settles any round that is ready: finalize after the last reveal,
+// refund once a window has closed.
 // Start: node listener.mjs <keypair.json>
 
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync, appendFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import {
+  DEFAULT_POLL_MS,
+  DEFAULT_RPC,
+  DEFAULT_WASM_BASE,
+  formatLogLine,
+  idlCandidates,
+  logFile,
+  nextDelay,
+  ownerTag,
+  pollMs,
+  rpcHost,
+  stateFile,
+} from "./lib.mjs";
 import { moduleFile, runWasm } from "./run.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const RPC = "https://api.devnet.solana.com";
-const idlPath = join(here, "..", "program", "target", "idl", "solcloud.json");
-const stateDir = join(here, ".state");
-const logFile = join(here, "logs", "listener.log");
 
-function log(taskId, action, result) {
-  const line = `${new Date().toISOString()} ${taskId} ${action} ${result}`;
-  console.log(line);
-  mkdirSync(dirname(logFile), { recursive: true });
-  appendFileSync(logFile, `${line}\n`);
-}
-
-function statePath(taskId) {
-  return join(stateDir, `${taskId}.json`);
-}
-
-function readState(taskId) {
-  return JSON.parse(readFileSync(statePath(taskId), "utf8"));
-}
-
-function writeState(taskId, output, nonce) {
-  mkdirSync(stateDir, { recursive: true });
-  writeFileSync(
-    statePath(taskId),
-    JSON.stringify({
-      output: Buffer.from(output).toString("hex"),
-      nonce: nonce.toString(),
-    })
-  );
-}
-
-function removeState(taskId) {
-  const file = statePath(taskId);
-  if (existsSync(file)) unlinkSync(file);
-}
+// A deadline is compared with this machine's clock. The margin keeps a
+// slightly fast clock from sending a refund the chain would still reject.
+const CLOCK_MARGIN_SECS = 20;
 
 function statusName(status) {
   if (typeof status === "string") return status;
@@ -63,16 +55,8 @@ function commitment(output, nonce) {
   return createHash("sha256").update(Buffer.concat([Buffer.from(output), nonceBytes])).digest();
 }
 
-async function retry(label, fn) {
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      if (attempt === 5) throw err;
-      log("-", label, `failed, retry ${attempt}/5`);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
-  }
+function nowSecs() {
+  return Math.floor(Date.now() / 1000);
 }
 
 const keypairPath = process.argv[2];
@@ -80,36 +64,160 @@ if (!keypairPath) {
   console.error("usage: node listener.mjs <keypair.json>");
   process.exit(1);
 }
-if (!existsSync(idlPath)) {
-  console.error(`IDL not found: ${idlPath}`);
+
+const owner = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(keypairPath, "utf8"))));
+const ownerText = owner.publicKey.toBase58();
+const tag = ownerTag(ownerText);
+const idlTried = idlCandidates(here, process.env.SOLCLOUD_IDL);
+const idlPath = idlTried.find((candidate) => existsSync(candidate));
+if (!idlPath) {
+  console.error("IDL not found. Tried:");
+  for (const candidate of idlTried) console.error(candidate);
   process.exit(1);
 }
 
-const owner = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(keypairPath, "utf8"))));
+const rpc = process.env.SOLCLOUD_RPC || DEFAULT_RPC;
+const wasmBase = process.env.SOLCLOUD_WASM_BASE || DEFAULT_WASM_BASE;
+const interval = process.env.SOLCLOUD_POLL_MS === undefined ? DEFAULT_POLL_MS : pollMs(process.env.SOLCLOUD_POLL_MS);
+const nodeLog = logFile(here, ownerText);
+let stopping = false;
+
+function log(taskId, action, detail) {
+  const line = formatLogLine({
+    iso: new Date().toISOString(),
+    node: tag,
+    task: taskId,
+    action,
+    detail,
+  });
+  console.log(line);
+  mkdirSync(dirname(nodeLog), { recursive: true });
+  appendFileSync(nodeLog, `${line}\n`);
+}
+
+// The same notice every poll would bury the log. Say it once per task.
+const said = new Set();
+function logOnce(taskId, action, detail) {
+  const key = `${taskId}:${action}:${detail}`;
+  if (said.has(key)) return;
+  said.add(key);
+  log(taskId, action, detail);
+}
+
+function errorText(err) {
+  const text = err?.message || String(err);
+  return text.split("\n")[0];
+}
+
+function statePath(taskId) {
+  return stateFile(here, ownerText, taskId);
+}
+
+function readState(taskId) {
+  const saved = JSON.parse(readFileSync(statePath(taskId), "utf8"));
+  return { output: Buffer.from(saved.output, "hex"), nonce: BigInt(saved.nonce) };
+}
+
+function writeState(taskId, output, nonce) {
+  const file = statePath(taskId);
+  mkdirSync(dirname(file), { recursive: true });
+  const tmp = `${file}.tmp`;
+  writeFileSync(
+    tmp,
+    JSON.stringify({
+      output: Buffer.from(output).toString("hex"),
+      nonce: nonce.toString(),
+    })
+  );
+  renameSync(tmp, file);
+}
+
+function removeState(taskId) {
+  const file = statePath(taskId);
+  if (existsSync(file)) unlinkSync(file);
+}
+
+process.on("unhandledRejection", (err) => {
+  log("-", "unhandledRejection", errorText(err));
+});
+process.on("uncaughtException", (err) => {
+  log("-", "uncaughtException", errorText(err));
+});
+function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  log("-", "stop", "stop");
+  process.exit(0);
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
 const idl = JSON.parse(readFileSync(idlPath, "utf8"));
-const connection = new Connection(RPC, "confirmed");
+const connection = new Connection(rpc, "confirmed");
 const provider = new AnchorProvider(connection, new Wallet(owner), { commitment: "confirmed" });
 const program = new Program(idl, provider);
-const [nodePda] = PublicKey.findProgramAddressSync(
-  [Buffer.from("node"), owner.publicKey.toBuffer()],
-  program.programId
-);
 
-function commitPda(taskKey) {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("commit"), taskKey.toBuffer(), owner.publicKey.toBuffer()],
-    program.programId
-  )[0];
+function pda(...seeds) {
+  return PublicKey.findProgramAddressSync(seeds, program.programId)[0];
+}
+
+const configPda = pda(Buffer.from("config"));
+
+function nodePdaOf(ownerKey) {
+  return pda(Buffer.from("node"), ownerKey.toBuffer());
+}
+
+function commitPdaOf(taskKey, ownerKey) {
+  return pda(Buffer.from("commit"), taskKey.toBuffer(), ownerKey.toBuffer());
+}
+
+function resultPda(taskKey) {
+  return pda(Buffer.from("result"), taskKey.toBuffer());
+}
+
+const nodePda = nodePdaOf(owner.publicKey);
+
+// A commit account made before `revealed_at` existed is 8 bytes shorter.
+// Eight zero bytes on the end read as revealed_at = 0, the same way the
+// program reads it. Borsh ignores bytes past the last field.
+async function readCommit(taskKey, ownerKey = owner.publicKey) {
+  const info = await connection.getAccountInfo(commitPdaOf(taskKey, ownerKey));
+  if (!info) return null;
+  return program.coder.accounts.decode("commitAccount", Buffer.concat([info.data, Buffer.alloc(8)]));
+}
+
+// Config is read as raw bytes: the treasury sits at a fixed offset in every
+// layout, including the 107-byte account from before `active_nodes`.
+let treasury = null;
+async function readTreasury() {
+  if (treasury) return treasury;
+  const info = await connection.getAccountInfo(configPda);
+  if (!info) throw new Error("Config account is missing.");
+  treasury = new PublicKey(info.data.subarray(40, 72));
+  return treasury;
+}
+
+// Send, and before each new attempt ask the chain whether the last one landed.
+// A transaction can land while its confirmation times out. Sending it again
+// would then fail with "already in use", which is how a node lost its nonce.
+async function send(taskId, label, build, landed) {
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      return await build().rpc();
+    } catch (err) {
+      if (await landed().catch(() => false)) return "landed";
+      if (attempt === 5) throw err;
+      log(taskId, label, `failed, retry ${attempt}/5: ${errorText(err)}`);
+      await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+    }
+  }
 }
 
 async function ensureModule(hash) {
   const file = moduleFile(hash);
   if (existsSync(file)) return { file, downloaded: false };
-  const base = process.env.SOLCLOUD_WASM_BASE;
-  if (!base) {
-    throw new Error(`No local wasm for ${hash}, and SOLCLOUD_WASM_BASE is unset.`);
-  }
-  const root = base.endsWith("/") ? base : `${base}/`;
+  if (!wasmBase) throw new Error(`No local wasm for ${hash}, and SOLCLOUD_WASM_BASE is unset.`);
+  const root = wasmBase.endsWith("/") ? wasmBase : `${wasmBase}/`;
   const url = new URL(`${hash}.wasm`, root);
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error(`Wasm URL must be http or https: ${url}`);
@@ -122,99 +230,218 @@ async function ensureModule(hash) {
   return { file, downloaded: true };
 }
 
-async function commitTask(task) {
-  const taskId = task.account.taskId.toString();
+// Run the task once and keep the output and nonce. A later commit attempt
+// reuses the same pair, so the hash on chain always matches the saved file.
+async function prepare(task, taskId) {
+  if (existsSync(statePath(taskId))) return readState(taskId);
   const wasmHash = Buffer.from(task.account.wasmHash).toString("hex");
   const input = Uint8Array.from(Buffer.from(task.account.input));
   let file = "";
   let downloaded = false;
-  let output;
   try {
     ({ file, downloaded } = await ensureModule(wasmHash));
-    output = await runWasm({ file, hash: wasmHash, input });
+    const output = Buffer.from(await runWasm({ file, hash: wasmHash, input }));
+    const nonce = randomBytes(8).readBigUInt64LE();
+    writeState(taskId, output, nonce);
+    log(taskId, "run", `output=${output.toString("hex")}`);
+    return { output, nonce };
   } catch (err) {
     if (downloaded && file && existsSync(file)) unlinkSync(file);
-    log(taskId, "wasm", err?.message || String(err));
-    return;
-  }
-  const nonce = randomBytes(8).readBigUInt64LE();
-  const hashCommitment = commitment(output, nonce);
-  writeState(taskId, output, nonce);
-  try {
-    const signature = await retry("commit", () =>
-      program.methods
-        .commitResult(new BN(taskId), Array.from(hashCommitment))
-        .accounts({
-          task: task.publicKey,
-          commit: commitPda(task.publicKey),
-          node: nodePda,
-          owner: owner.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([owner])
-        .rpc()
-    );
-    log(taskId, "commit", signature);
-  } catch (err) {
-    removeState(taskId);
-    log(taskId, "commit", err?.message || String(err));
+    logOnce(taskId, "wasm", errorText(err));
+    return null;
   }
 }
 
-async function revealTask(task) {
-  const taskId = task.account.taskId.toString();
-  const saved = readState(taskId);
-  const output = Buffer.from(saved.output, "hex");
-  const nonce = new BN(saved.nonce);
+async function commitTask(task, taskId) {
+  const onChain = await readCommit(task.publicKey);
+  if (onChain) {
+    if (!existsSync(statePath(taskId))) {
+      logOnce(taskId, "commit", "on chain, but the saved output and nonce are gone. This node cannot reveal");
+    }
+    return;
+  }
+  if (nowSecs() > task.account.commitDeadline.toNumber()) return;
+
+  const saved = await prepare(task, taskId);
+  if (!saved) return;
+  const hashCommitment = commitment(saved.output, saved.nonce);
   try {
-    const signature = await retry("reveal", () =>
-      program.methods
-        .revealResult(new BN(taskId), output, nonce)
-        .accounts({
-          task: task.publicKey,
-          commit: commitPda(task.publicKey),
-          owner: owner.publicKey,
-        })
-        .signers([owner])
-        .rpc()
+    const signature = await send(
+      taskId,
+      "commit",
+      () =>
+        program.methods
+          .commitResult(new BN(taskId), Array.from(hashCommitment))
+          .accountsPartial({
+            task: task.publicKey,
+            commit: commitPdaOf(task.publicKey, owner.publicKey),
+            node: nodePda,
+            owner: owner.publicKey,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([owner]),
+      async () => {
+        const commit = await readCommit(task.publicKey);
+        return Boolean(commit) && Buffer.from(commit.hashCommitment).equals(hashCommitment);
+      }
+    );
+    log(taskId, "commit", signature);
+  } catch (err) {
+    // The saved file stays. The next poll sends the same commitment again.
+    log(taskId, "commit", errorText(err));
+  }
+}
+
+async function revealTask(task, taskId) {
+  const onChain = await readCommit(task.publicKey);
+  if (!onChain) return;
+  if (onChain.revealed) {
+    removeState(taskId);
+    return;
+  }
+  if (!existsSync(statePath(taskId))) {
+    logOnce(taskId, "reveal", "no saved output and nonce for this commit");
+    return;
+  }
+  if (nowSecs() > task.account.revealDeadline.toNumber()) return;
+
+  const saved = readState(taskId);
+  if (!Buffer.from(onChain.hashCommitment).equals(commitment(saved.output, saved.nonce))) {
+    logOnce(taskId, "reveal", "the saved output and nonce do not match the commit on chain");
+    return;
+  }
+  try {
+    const signature = await send(
+      taskId,
+      "reveal",
+      () =>
+        program.methods
+          .revealResult(new BN(taskId), saved.output, new BN(saved.nonce.toString()))
+          .accountsPartial({
+            task: task.publicKey,
+            commit: commitPdaOf(task.publicKey, owner.publicKey),
+            owner: owner.publicKey,
+          })
+          .signers([owner]),
+      async () => Boolean((await readCommit(task.publicKey))?.revealed)
     );
     log(taskId, "reveal", signature);
     removeState(taskId);
   } catch (err) {
-    log(taskId, "reveal", err?.message || String(err));
+    log(taskId, "reveal", errorText(err));
   }
 }
 
-let running = false;
+// Which settle step a round is ready for, if any. Anyone may send either one.
+function settleStep(task) {
+  const account = task.account;
+  const status = statusName(account.status);
+  const now = nowSecs() - CLOCK_MARGIN_SECS;
+  if (status === "revealing" && account.revealCount === account.committeeSize) return "finalize";
+  if (status === "committing" && now > account.commitDeadline.toNumber()) return "refund";
+  if (
+    status === "revealing" &&
+    now > account.revealDeadline.toNumber() &&
+    account.revealCount < account.committeeSize
+  ) {
+    return "refund";
+  }
+  return null;
+}
+
+async function settleTask(task, taskId, step) {
+  const result = resultPda(task.publicKey);
+  const settled = async () => Boolean(await connection.getAccountInfo(result));
+  if (await settled()) return;
+
+  try {
+    let build;
+    if (step === "finalize") {
+      // Remaining accounts are triples in committee order: commit, owner wallet, node PDA.
+      const remaining = [];
+      for (const member of task.account.committee) {
+        const memberKey = new PublicKey(member);
+        remaining.push(
+          { pubkey: commitPdaOf(task.publicKey, memberKey), isSigner: false, isWritable: false },
+          { pubkey: memberKey, isSigner: false, isWritable: true },
+          { pubkey: nodePdaOf(memberKey), isSigner: false, isWritable: true }
+        );
+      }
+      const treasuryKey = await readTreasury();
+      build = () =>
+        program.methods
+          .finalize(new BN(taskId))
+          .accountsPartial({
+            task: task.publicKey,
+            result,
+            config: configPda,
+            treasury: treasuryKey,
+            requester: task.account.requester,
+            payer: owner.publicKey,
+            systemProgram: SystemProgram.programId,
+          })
+          .remainingAccounts(remaining)
+          .signers([owner]);
+    } else {
+      build = () =>
+        program.methods
+          .refundExpired(new BN(taskId))
+          .accountsPartial({
+            task: task.publicKey,
+            result,
+            requester: task.account.requester,
+            payer: owner.publicKey,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([owner]);
+    }
+    const signature = await send(taskId, step, build, settled);
+    log(taskId, step, signature);
+  } catch (err) {
+    // Another node may have settled it in the same moment.
+    if (await settled().catch(() => false)) return;
+    log(taskId, step, errorText(err));
+  }
+}
 
 async function pollOnce() {
-  if (running) return;
-  running = true;
-  try {
-    const tasks = await program.account.taskAccount.all();
-    for (const task of tasks) {
-      if (!task.account.committee.some((member) => sameKey(member, owner.publicKey))) continue;
-      const taskId = task.account.taskId.toString();
-      const status = statusName(task.account.status);
-      const saved = existsSync(statePath(taskId));
-      try {
-        if (status === "committing" && !saved) {
-          await commitTask(task);
-        } else if (status === "revealing" && saved) {
-          const commit = await program.account.commitAccount.fetchNullable(commitPda(task.publicKey));
-          if (commit?.revealed) removeState(taskId);
-          else await revealTask(task);
-        }
-      } catch (err) {
-        log(taskId, "error", err?.message || String(err));
-      }
+  const tasks = await program.account.taskAccount.all();
+  for (const task of tasks) {
+    if (stopping) return;
+    const taskId = task.account.taskId.toString();
+    const status = statusName(task.account.status);
+    try {
+      const mine = task.account.committee.some((member) => sameKey(member, owner.publicKey));
+      if (mine && status === "committing") await commitTask(task, taskId);
+      else if (mine && status === "revealing") await revealTask(task, taskId);
+      else if (mine && existsSync(statePath(taskId))) removeState(taskId);
+
+      const step = settleStep(task);
+      if (step) await settleTask(task, taskId, step);
+    } catch (err) {
+      log(taskId, "error", errorText(err));
     }
-  } catch (err) {
-    log("-", "poll", err?.message || String(err));
-  } finally {
-    running = false;
   }
 }
 
-log("-", "start", `${owner.publicKey.toBase58()} node ${nodePda.toBase58()}`);
-setInterval(pollOnce, 3000);
+// One poll at a time. A busy public RPC answers 429; wait longer each time.
+async function loop() {
+  let failures = 0;
+  while (!stopping) {
+    try {
+      await pollOnce();
+      failures = 0;
+    } catch (err) {
+      failures += 1;
+      log("-", "poll", errorText(err));
+    }
+    await new Promise((resolve) => setTimeout(resolve, nextDelay(interval, failures)));
+  }
+}
+
+log(
+  "-",
+  "start",
+  `owner=${ownerText} pda=${nodePda.toBase58()} program=${program.programId.toBase58()} rpc=${rpcHost(rpc)} idl=${idlPath} poll=${interval} wasm=${wasmBase || "local only"}`
+);
+loop();

@@ -66,15 +66,15 @@
   - [x] Validate `committee_size` is odd and within [3, 11]
   - [x] Require enough registered/available nodes for the chosen `N`
 - [x] Committee selection: the dashboard reads the nodes that are active at request time, ranks them by reputation, and breaks a tie with the latest block hash. The program still receives that list and checks each node. Reputation stays 0 until a round updates it
-- [ ] On-chain committee is in the program and not deployed. Part 1: `Config.active_nodes`, `extend_registry`, `index_node`. Part 2: `request_task` draws the committee from that list with `sha256(slot ‖ task_id)` and rejects a different remaining-accounts list. The slot is the one the client just read, and it must be within 300 slots, because a wallet cannot land in the same slot it signed. Not a VRF. A requester can still grind `task_id`. With only 3 nodes and N=3 every node is selected. The dashboard uses this draw only after the config account has been extended
+- [x] On-chain committee, deployed Oct 10 (slot 509308160). Part 1: `Config.active_nodes`, `extend_registry`, `index_node`. Part 2: `request_task` draws the committee from that list with `sha256(slot ‖ task_id)` and rejects a different remaining-accounts list. The slot is the one the client just read, and it must be within 300 slots, because a wallet cannot land in the same slot it signed. Not a VRF. A requester can still grind `task_id`. With only 3 nodes and N=3 every node is selected. The dashboard uses this draw only after the config account has been extended
 - [x] `commit_result(task_id, hash_commitment)` — node submits commit
 - [x] `reveal_result(task_id, result, nonce)` — node reveals answer
 - [x] Finalize logic: **M-of-N majority** check (`threshold = N/2 + 1`), create `TaskResult`
 - [x] Reward distribution across the matching (correct) nodes
-- [ ] Marketplace fields. Every stat on the site must come from data the protocol already checked (reveal time, a slash), never from a number the node reports about itself (`state.rs`, `lib.rs`)
-  - [x] Add `revealed_at: i64` to `CommitAccount`. Set it in `reveal_result` when the reveal is stored. In the program, not deployed
-  - [x] In `finalize`, increment `tasks_completed` on each winning node. The field exists and is never written. In the program, not deployed
-  - [x] Add `tasks_slashed: u64` to `NodeAccount`. Increment it for each losing node in the slash loop. The client computes success rate as `tasks_completed / (tasks_completed + tasks_slashed)`. In the program, not deployed
+- [x] Marketplace fields. Every stat on the site must come from data the protocol already checked (reveal time, a slash), never from a number the node reports about itself (`state.rs`, `lib.rs`)
+  - [x] Add `revealed_at: i64` to `CommitAccount`. Set it in `reveal_result` when the reveal is stored. Deployed
+  - [x] In `finalize`, increment `tasks_completed` on each winning node. The field exists and is never written. Deployed
+  - [x] Add `tasks_slashed: u64` to `NodeAccount`. Increment it for each losing node in the slash loop. The client computes success rate as `tasks_completed / (tasks_completed + tasks_slashed)`. Deployed
 
 ### Worker node (TypeScript)
 - [x] Solana RPC listener for new tasks. `worker/listener.mjs` polls devnet every 3 seconds, one process per keypair. It does not use a WebSocket

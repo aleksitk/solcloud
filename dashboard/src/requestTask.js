@@ -6,7 +6,8 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 
-export const RPC = "https://api.devnet.solana.com";
+// The public devnet RPC limits each IP. Set VITE_SOLANA_RPC at build time to use another devnet endpoint.
+export const RPC = import.meta.env.VITE_SOLANA_RPC || "https://api.devnet.solana.com";
 export const PROGRAM_ID = new PublicKey("D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ");
 export const WASM_HASH = "ee0b3e4c3ede257e3719c52deee27528ea791218cdea3a5802fd52bf9ce5057a";
 // Rounds already on devnet named the maze before `run` was added.
@@ -121,6 +122,10 @@ function readTaskCount(data) {
   const bytes = Uint8Array.from(data);
   return new DataView(bytes.buffer).getBigUint64(96, true);
 }
+
+// Rounds before this id ran on the earlier program or were test runs. They stay on
+// devnet; the site starts its history here.
+const FIRST_ROUND = 11;
 
 const ROUND_STATUS = ["Requested", "Committing", "Revealing", "Finalized", "Failed", "Refunded"];
 
@@ -239,7 +244,7 @@ export async function readMyRequests(owner) {
 
   const ids = [];
   const tasks = [];
-  for (let id = 1; id <= count; id += 1) {
+  for (let id = FIRST_ROUND; id <= count; id += 1) {
     ids.push(BigInt(id));
     tasks.push(taskPda(BigInt(id)));
   }
@@ -307,7 +312,7 @@ async function loadSettledRounds() {
   if (!count) return [];
 
   const ids = [];
-  for (let id = count; id >= 1; id -= 1) ids.push(BigInt(id));
+  for (let id = count; id >= FIRST_ROUND; id -= 1) ids.push(BigInt(id));
   const tasks = ids.map((id) => taskPda(id));
   const taskInfos = await withRetries(() => connection.getMultipleAccountsInfo(tasks));
   const rows = [];
@@ -443,7 +448,7 @@ async function loadCommitRows(owners) {
   if (!count) return grouped;
 
   const tasks = [];
-  for (let id = 1; id <= count; id += 1) tasks.push(taskPda(BigInt(id)));
+  for (let id = FIRST_ROUND; id <= count; id += 1) tasks.push(taskPda(BigInt(id)));
   const taskInfos = await accountsInfo(tasks);
 
   const commitKeys = [];
@@ -483,7 +488,7 @@ async function loadCommitRows(owners) {
   for (let index = 0; index < hits.length; index += 1) {
     const where = needed[index];
     if (!taskInfos[where.index]) continue;
-    const task = parseTask(taskInfos[where.index].data, BigInt(where.index + 1), tasks[where.index]);
+    const task = parseTask(taskInfos[where.index].data, BigInt(where.index + FIRST_ROUND), tasks[where.index]);
     const result = parseResult(resultByIndex.get(where.index)?.data);
     const seconds = revealSeconds(task.createdAt, hits[index].revealedAt);
     const verdict = nodeOutcome(task, hits[index], result);
@@ -602,8 +607,11 @@ export function readNodes() {
   return remember("nodes", 15000, loadNodes);
 }
 
+// Only owners on config.active_nodes can be drawn. A node account outside it
+// (registered before the registry existed, and never indexed) is left off the site.
 async function loadNodes() {
-  const accounts = await nodeAccounts();
+  const [accounts, registry] = await Promise.all([nodeAccounts(), readActiveOwners()]);
+  const listed = registry ? new Set(registry) : null;
   const nodes = accounts.map(({ pubkey, account }) => {
     const data = Buffer.from(account.data);
     const owner = new PublicKey(data.subarray(8, 40)).toBase58();
@@ -626,7 +634,7 @@ async function loadNodes() {
     };
   });
   nodes.sort((a, b) => a.owner.localeCompare(b.owner));
-  return nodes;
+  return listed ? nodes.filter((node) => listed.has(node.owner)) : nodes;
 }
 
 export async function buildRegisterNode({ owner, stakeLamports }) {
@@ -662,7 +670,7 @@ async function loadLatestRound() {
   const info = await readAccount(config);
   if (!info) throw new Error("The protocol config is missing on devnet.");
   const id = readTaskCount(info.data);
-  if (id === 0n) return null;
+  if (id < BigInt(FIRST_ROUND)) return null;
   return readRound(id);
 }
 
@@ -767,7 +775,7 @@ export async function selectCommittee(owners, size, seedSlot, taskId) {
 }
 
 export async function currentSlot() {
-  return withRetries(() => connection.getSlot("processed"));
+  return withRetries(() => connection.getSlot("confirmed"));
 }
 
 export async function nextTaskId() {

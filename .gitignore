@@ -27,6 +27,8 @@ test-ledger/
 # ---- Wasm build artifacts ----
 *.wasm
 !wasm/testvectors/**/*.wasm
+# Modules nodes download by hash. The site and GitHub both serve this folder.
+!dashboard/public/wasm/*.wasm
 
 # ---- React / Vite / Next ----
 dashboard/dist/

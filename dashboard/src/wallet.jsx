@@ -1,6 +1,5 @@
-import { createContext, useContext, useRef, useState } from "react";
-
-const RPC = "https://api.devnet.solana.com";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { RPC } from "./requestTask.js";
 const WalletContext = createContext(null);
 
 export function walletChoices() {
@@ -20,6 +19,24 @@ export function walletChoices() {
       install: "https://solflare.com/download",
     },
   ];
+}
+
+// Phantom answers -32603 "Unexpected error" for its own internal faults, often
+// right after it unlocks. A second request a moment later usually succeeds.
+const WALLET_INTERNAL = -32603;
+
+function pause(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function walletErrorText(err) {
+  const code = err?.code;
+  if (code === 4001) return "The request was rejected in the wallet.";
+  if (code === -32002) return "A wallet request is already open. Finish it in the wallet window.";
+  if (code === WALLET_INTERNAL || /unexpected error/i.test(err?.message || "")) {
+    return "The wallet reported an internal error. Unlock it, set it to Devnet, and try again. If it repeats, remove this site under the wallet's Connected apps and connect again.";
+  }
+  return err?.message || "Connection was rejected.";
 }
 
 async function devnetBalance(address) {
@@ -62,10 +79,45 @@ export function WalletProvider({ children }) {
     }
   }
 
+  // Follow an account switch inside the wallet, and a disconnect from its side.
+  useEffect(() => {
+    const provider = providerRef.current;
+    if (!provider?.on) return undefined;
+    function onAccount(next) {
+      if (!next) {
+        setAddress(null);
+        setBalance(null);
+        return;
+      }
+      const key = next.toString();
+      setAddress(key);
+      refreshBalance(key);
+    }
+    function onDisconnect() {
+      setAddress(null);
+      setBalance(null);
+    }
+    provider.on("accountChanged", onAccount);
+    provider.on("disconnect", onDisconnect);
+    return () => {
+      provider.removeListener?.("accountChanged", onAccount);
+      provider.removeListener?.("disconnect", onDisconnect);
+    };
+  }, [address]);
+
   async function connect(wallet) {
     setNote("");
-    const response = await wallet.provider.connect();
-    const key = wallet.provider.publicKey?.toString() || response.publicKey.toString();
+    let response;
+    try {
+      response = await wallet.provider.connect();
+    } catch (err) {
+      console.error("wallet connect", err);
+      if (err?.code !== WALLET_INTERNAL) throw err;
+      await pause(500);
+      response = await wallet.provider.connect();
+    }
+    const key = wallet.provider.publicKey?.toString() || response?.publicKey?.toString();
+    if (!key) throw new Error("The wallet did not return an address.");
     providerRef.current = wallet.provider;
     setAddress(key);
     refreshBalance(key);

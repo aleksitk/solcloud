@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useWallet, walletChoices } from "./wallet.jsx";
+import { useWallet, walletChoices, walletErrorText } from "./wallet.jsx";
 
 function short(value) {
   return `${value.slice(0, 4)}…${value.slice(-4)}`;
@@ -24,7 +24,8 @@ export default function WalletButton() {
       await connect(wallet);
       setOpen(false);
     } catch (err) {
-      setNote(err?.message || "Connection was rejected.");
+      console.error("wallet connect", err);
+      setNote(walletErrorText(err));
     }
   }
 
