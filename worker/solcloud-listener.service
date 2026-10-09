@@ -9,6 +9,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/path/to/solcloud/worker
+# Environment=SOLCLOUD_WASM_BASE=https://host.example/modules
 ExecStart=/usr/bin/node listener.mjs /path/to/node-keypair.json
 Restart=on-failure
 RestartSec=3

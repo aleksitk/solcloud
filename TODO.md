@@ -77,12 +77,12 @@
   - [x] Add `tasks_slashed: u64` to `NodeAccount`. Increment it for each losing node in the slash loop. The client computes success rate as `tasks_completed / (tasks_completed + tasks_slashed)`. In the program, not deployed
 
 ### Worker node (TypeScript)
-- [ ] Solana RPC/WebSocket listener for new tasks
-- [ ] Download Wasm file and verify hash
-- [ ] Run in Node.js WebAssembly: worker thread + timeout (the runner in `worker/` does this; it does not listen for tasks yet)
-- [ ] Build and send commit transaction
-- [ ] Build and send reveal transaction (after commit window)
-- [ ] Logging (task ID, time, result)
+- [x] Solana RPC listener for new tasks. `worker/listener.mjs` polls devnet every 3 seconds, one process per keypair. It does not use a WebSocket
+- [x] Download Wasm file and verify hash. A file already at `worker/modules/<hash>.wasm` is used as-is. Otherwise the listener downloads `SOLCLOUD_WASM_BASE/<hash>.wasm`, and `runWasm` rejects it when the SHA-256 does not match the task. Publishing that host is still the Phase 1 item
+- [x] Run in Node.js WebAssembly: worker thread + timeout. The listener calls `runWasm()` in `worker/run.mjs`
+- [x] Build and send the commit transaction. The listener sends `commit_result` with the Anchor client
+- [x] Build and send the reveal transaction once the task status is Revealing. The nonce and output stay in `worker/.state/<task_id>.json` until the reveal lands
+- [x] Logging (task ID, time, result). Console, and one line per event in `worker/logs/listener.log`
 
 ### Consumer dApp (mini)
 - [ ] Simple Anchor program that calls `request_task` via CPI (with chosen `committee_size`)

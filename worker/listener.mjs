@@ -102,11 +102,41 @@ function commitPda(taskKey) {
   )[0];
 }
 
+async function ensureModule(hash) {
+  const file = moduleFile(hash);
+  if (existsSync(file)) return { file, downloaded: false };
+  const base = process.env.SOLCLOUD_WASM_BASE;
+  if (!base) {
+    throw new Error(`No local wasm for ${hash}, and SOLCLOUD_WASM_BASE is unset.`);
+  }
+  const root = base.endsWith("/") ? base : `${base}/`;
+  const url = new URL(`${hash}.wasm`, root);
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error(`Wasm URL must be http or https: ${url}`);
+  }
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Wasm download failed (${response.status}) ${url}`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, bytes);
+  return { file, downloaded: true };
+}
+
 async function commitTask(task) {
   const taskId = task.account.taskId.toString();
   const wasmHash = Buffer.from(task.account.wasmHash).toString("hex");
   const input = Uint8Array.from(Buffer.from(task.account.input));
-  const output = await runWasm({ file: moduleFile(wasmHash), hash: wasmHash, input });
+  let file = "";
+  let downloaded = false;
+  let output;
+  try {
+    ({ file, downloaded } = await ensureModule(wasmHash));
+    output = await runWasm({ file, hash: wasmHash, input });
+  } catch (err) {
+    if (downloaded && file && existsSync(file)) unlinkSync(file);
+    log(taskId, "wasm", err?.message || String(err));
+    return;
+  }
   const nonce = randomBytes(8).readBigUInt64LE();
   const hashCommitment = commitment(output, nonce);
   writeState(taskId, output, nonce);

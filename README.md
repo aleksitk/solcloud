@@ -92,7 +92,7 @@ One process per keypair. From `worker/`, after `npm install`, and after `anchor 
 node listener.mjs ~/.config/solana/solcloud-node1.json
 ```
 
-The Wasm file for a task must already be at `worker/modules/<hash>.wasm`. The process polls devnet every 3 seconds. It stores the output and nonce in `worker/.state/<task_id>.json` until the reveal lands. Each event is also appended to `worker/logs/listener.log`.
+The listener uses `worker/modules/<hash>.wasm` when that file is already on the machine. Otherwise it downloads `SOLCLOUD_WASM_BASE/<hash>.wasm` and refuses the file if the SHA-256 does not match the task. The process polls devnet every 3 seconds. It stores the output and nonce in `worker/.state/<task_id>.json` until the reveal lands. Each event is also appended to `worker/logs/listener.log`.
 
 `worker/solcloud-listener.service` restarts the process if it exits. Edit `WorkingDirectory` and the keypair path in that file, then:
 
