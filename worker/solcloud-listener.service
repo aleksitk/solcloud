@@ -1,0 +1,17 @@
+# Edit WorkingDirectory and the keypair path, then install this unit.
+# One unit per node. Point ExecStart at that node's keypair.
+
+[Unit]
+Description=SolCloud node listener
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/path/to/solcloud/worker
+ExecStart=/usr/bin/node listener.mjs /path/to/node-keypair.json
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

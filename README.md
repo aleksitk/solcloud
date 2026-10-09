@@ -40,7 +40,7 @@ Wallet ── request_task ──► SolCloud program (devnet)
 
 Reputation is stored on the node account. The program does not change it after a round yet, so equal scores are ordered by the block hash.
 
-The dashboard signs the request and the stake, and it reads accounts. Commit, reveal, and finalize for the live rounds are sent by the scripts in `program/scripts/` from the operator machine. The worker runner does not listen for tasks yet.
+The dashboard signs the request and the stake, and it reads accounts. A node runs `worker/listener.mjs` to commit and reveal. Finalize, and the manual commit and reveal scripts, stay in `program/scripts/`.
 
 ## Repository
 
@@ -48,7 +48,7 @@ The dashboard signs the request and the stake, and it reads accounts. Commit, re
 solcloud/
 ├── program/     Anchor program and the devnet scripts
 ├── wasm/        Labyrinth module, alloc/run ABI, test vectors
-├── worker/      Hash check and timed Wasm run
+├── worker/      Hash check, timed Wasm run, and the task listener
 ├── dashboard/   The site: rounds, functions, new task, stake
 └── docs/        Toolchain notes
 ```
@@ -83,6 +83,23 @@ npm run check
 ```
 
 That runs the maze vector, rejects a file whose hash does not match, and stops a run that exceeds the timeout.
+
+## Running a node
+
+One process per keypair. From `worker/`, after `npm install`, and after `anchor build` has written `program/target/idl/solcloud.json`:
+
+```bash
+node listener.mjs ~/.config/solana/solcloud-node1.json
+```
+
+The Wasm file for a task must already be at `worker/modules/<hash>.wasm`. The process polls devnet every 3 seconds. It stores the output and nonce in `worker/.state/<task_id>.json` until the reveal lands. Each event is also appended to `worker/logs/listener.log`.
+
+`worker/solcloud-listener.service` restarts the process if it exits. Edit `WorkingDirectory` and the keypair path in that file, then:
+
+```bash
+sudo cp solcloud-listener.service /etc/systemd/system/
+sudo systemctl enable --now solcloud-listener
+```
 
 ## Settle a round
 

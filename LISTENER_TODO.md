@@ -23,22 +23,22 @@ unnecessary extra work with more room for bugs.
 - [ ] Confirm `anchor build` has produced `program/target/idl/solcloud.json`
       and `program/target/types/solcloud.ts` — the listener imports the
       IDL JSON directly, no need for the generated TS types in plain JS
-- [ ] Add `@coral-xyz/anchor` and `@solana/web3.js` as dependencies in
+- [x] Add `@coral-xyz/anchor` and `@solana/web3.js` as dependencies in
       `worker/package.json` (check they're not already there)
-- [ ] Decide the node's own keypair path — pass as a CLI arg or env var,
+- [x] Decide the node's own keypair path — pass as a CLI arg or env var,
       e.g. `node listener.mjs ~/.config/solana/solcloud-node1.json`
 
 ---
 
 ## 1. Program client setup
 
-- [ ] Load the IDL (`JSON.parse(readFileSync(idlPath))`)
-- [ ] Build a read-only `AnchorProvider`/`Program` instance against devnet
+- [x] Load the IDL (`JSON.parse(readFileSync(idlPath))`)
+- [x] Build a read-only `AnchorProvider`/`Program` instance against devnet
       RPC (`https://api.devnet.solana.com`) for **fetching** accounts —
       this doesn't need a signer
-- [ ] Separately, load this node's `Keypair` from the file path argument
+- [x] Separately, load this node's `Keypair` from the file path argument
       — this signs commit/reveal transactions
-- [ ] Derive this node's `NodeAccount` PDA:
+- [x] Derive this node's `NodeAccount` PDA:
       `seeds = [Buffer.from("node"), owner.publicKey.toBuffer()]`
 
 ---
@@ -49,9 +49,9 @@ unnecessary extra work with more room for bugs.
 hash. The listener computes these once at commit time and must remember
 them until it reveals, potentially across a process restart.
 
-- [ ] Create `worker/.state/` (gitignored) — one JSON file per task:
+- [x] Create `worker/.state/` (gitignored) — one JSON file per task:
       `worker/.state/<task_id>.json` containing `{ output: <hex>, nonce: <string> }`
-- [ ] Write this file **immediately after** a successful commit, before
+- [x] Write this file **immediately after** a successful commit, before
       moving on — if the listener crashes between commit and reveal, it
       can recover the nonce/output on restart instead of losing the task
 
@@ -59,61 +59,61 @@ them until it reveals, potentially across a process restart.
 
 ## 3. Discovery loop
 
-- [ ] `async function pollOnce()`:
-  - [ ] `const tasks = await program.account.taskAccount.all()`
-  - [ ] Filter to tasks where `task.account.committee` contains this
+- [x] `async function pollOnce()`:
+  - [x] `const tasks = await program.account.taskAccount.all()`
+  - [x] Filter to tasks where `task.account.committee` contains this
         node's **owner pubkey** (not the node PDA — confirm which one
         `committee: Vec<Pubkey>` actually stores by checking
         `request_task`'s account-matching logic in `lib.rs`)
-  - [ ] Split into two buckets:
+  - [x] Split into two buckets:
         - `status === "committing"` **and** no local state file yet for
           that `task_id` → needs a commit
         - `status === "revealing"` **and** a local state file exists for
           that `task_id` **and** no on-chain `revealed = true` yet →
           needs a reveal
-- [ ] `setInterval(pollOnce, 3000)` (3s — adjust later if needed; no
+- [x] `setInterval(pollOnce, 3000)` (3s — adjust later if needed; no
       reason to start lower)
-- [ ] Wrap `pollOnce` in try/catch — one failed RPC call must not kill
+- [x] Wrap `pollOnce` in try/catch — one failed RPC call must not kill
       the whole process; log and continue to the next tick
 
 ---
 
 ## 4. Commit path
 
-- [ ] For each task needing a commit:
-  - [ ] Read `task.account.wasmHash` and `task.account.input` from the
+- [x] For each task needing a commit:
+  - [x] Read `task.account.wasmHash` and `task.account.input` from the
         fetched account (Anchor decodes these as a Buffer/array already)
-  - [ ] Call `runWasm({ file: moduleFile(wasmHash), hash: wasmHash, input })`
+  - [x] Call `runWasm({ file: moduleFile(wasmHash), hash: wasmHash, input })`
         from `worker/run.mjs` (import it — don't reimplement)
-  - [ ] Generate a random nonce (e.g. `crypto.randomBytes(8)` as a u64)
-  - [ ] Compute `hash_commitment = sha256(output ‖ nonce)` — same scheme
+  - [x] Generate a random nonce (e.g. `crypto.randomBytes(8)` as a u64)
+  - [x] Compute `hash_commitment = sha256(output ‖ nonce)` — same scheme
         as `commit-result.cjs`'s `commitment()` function, but on the
         **real** output instead of the hardcoded maze constant
-  - [ ] Write the local state file (step 2) **before** sending the tx
-  - [ ] Call `program.methods.commitResult(taskId, hashCommitment).accounts({...}).signers([owner]).rpc()`
+  - [x] Write the local state file (step 2) **before** sending the tx
+  - [x] Call `program.methods.commitResult(taskId, hashCommitment).accounts({...}).signers([owner]).rpc()`
         — let Anchor build the instruction; this replaces the manual
         `TransactionInstruction`/discriminator code from the `.cjs` script
-  - [ ] Log: task id, action "commit", signature
+  - [x] Log: task id, action "commit", signature
 
 ---
 
 ## 5. Reveal path
 
-- [ ] For each task needing a reveal:
-  - [ ] Read the local state file for that `task_id` (output + nonce)
-  - [ ] Call `program.methods.revealResult(taskId, output, nonce).accounts({...}).signers([owner]).rpc()`
-  - [ ] Log: task id, action "reveal", signature
-  - [ ] Delete or archive the local state file once revealed, so it
+- [x] For each task needing a reveal:
+  - [x] Read the local state file for that `task_id` (output + nonce)
+  - [x] Call `program.methods.revealResult(taskId, output, nonce).accounts({...}).signers([owner]).rpc()`
+  - [x] Log: task id, action "reveal", signature
+  - [x] Delete or archive the local state file once revealed, so it
         isn't picked up again
 
 ---
 
 ## 6. Retry / error handling
 
-- [ ] Reuse the `retry()` pattern already in `commit-result.cjs` (5
+- [x] Reuse the `retry()` pattern already in `commit-result.cjs` (5
       attempts, 2s backoff) for `.rpc()` calls — RPC hiccups on devnet
       are common and not a sign of a real bug
-- [ ] If a transaction fails after all retries, log it clearly and move
+- [x] If a transaction fails after all retries, log it clearly and move
       on to the next poll cycle rather than crashing — the next tick
       will retry automatically since the state file / on-chain status
       hasn't changed
@@ -122,8 +122,8 @@ them until it reveals, potentially across a process restart.
 
 ## 7. Logging
 
-- [ ] Console output for visibility while developing
-- [ ] Also append each action to `worker/logs/listener.log` (gitignored),
+- [x] Console output for visibility while developing
+- [x] Also append each action to `worker/logs/listener.log` (gitignored),
       one line per event: ISO timestamp, task id, action, result/signature
       — useful both for debugging and as a visual artifact for the demo
       video ("here's the node's own log of everything it did")
@@ -132,9 +132,9 @@ them until it reveals, potentially across a process restart.
 
 ## 8. Process supervision (do this once the script itself works)
 
-- [ ] Write a `systemd` unit (or a `pm2` config) so the listener restarts
-      automatically if it crashes or the Pi reboots
-- [ ] Document the exact start command in `README.md` under a new
+- [x] Write a `systemd` unit (or a `pm2` config) so the listener restarts
+      automatically if it crashes or the Pi reboots. `worker/solcloud-listener.service` uses `Restart=on-failure`. Edit the paths before enabling it
+- [x] Document the exact start command in `README.md` under a new
       "Running a node" section
 
 ---
