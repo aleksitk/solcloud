@@ -6,7 +6,14 @@ const FunctionChoiceContext = createContext(null);
 // The editor's source and its last compile live here, so they survive a tab change.
 export function FunctionProvider({ children }) {
   const [source, setSourceText] = useState(STARTER);
-  const [compiled, setCompiled] = useState(null);
+  const [compiled, setCompiledValue] = useState(null);
+  // True once the compiled module is complete on chain under the connected wallet.
+  const [published, setPublished] = useState(false);
+
+  function setCompiled(next) {
+    setCompiledValue(next);
+    setPublished(false);
+  }
 
   // An edit after a compile makes the stored hash stale.
   function setSource(next) {
@@ -15,7 +22,7 @@ export function FunctionProvider({ children }) {
   }
 
   return (
-    <FunctionChoiceContext.Provider value={{ source, setSource, compiled, setCompiled }}>
+    <FunctionChoiceContext.Provider value={{ source, setSource, compiled, setCompiled, published, setPublished }}>
       {children}
     </FunctionChoiceContext.Provider>
   );

@@ -1,8 +1,10 @@
 // SolCloud from a terminal, without the site.
 //   node cli.mjs request <keypair.json> --wasm <file.wasm|hash> --input <hex> [--reward 0.05] [--committee 3]
+//   node cli.mjs publish <keypair.json> <file.wasm>
 //   node cli.mjs stake   <keypair.json> [--sol 1]
 //   node cli.mjs status  <task-id>
 //   node cli.mjs nodes
+// request publishes a .wasm file on chain first, so every node can fetch it.
 // Add --dry-run to request or stake to simulate without sending.
 
 import { createHash } from "node:crypto";
@@ -22,7 +24,7 @@ function fail(message) {
 }
 
 function usage() {
-  fail(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 6).join("\n").replaceAll("// ", ""));
+  fail(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 8).join("\n").replaceAll("// ", ""));
 }
 
 function flags(args) {
@@ -79,6 +81,45 @@ function selectCommittee(owners, size, seedSlot, taskId) {
   return order.slice(0, size);
 }
 
+// Bytes of the module per write. A transaction holds about 1 KB.
+const CHUNK = 900;
+
+// Store a module on chain under this key, in order, unless it is already there.
+async function publishModule(program, owner, bytes) {
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  const module = pda(program, Buffer.from("module"), owner.publicKey.toBuffer(), Buffer.from(hash, "hex"));
+  let stored = await program.account.moduleAccount.fetchNullable(module);
+  if (stored?.sealed) return { hash, module, sent: 0 };
+  if (bytes.length > 10_000) fail("A module is capped at 10000 bytes.");
+  let sent = 0;
+  if (!stored) {
+    await program.methods
+      .createModule([...Buffer.from(hash, "hex")], bytes.length)
+      .accounts({ module, uploader: owner.publicKey, systemProgram: SystemProgram.programId })
+      .rpc();
+    sent += 1;
+    stored = { data: [] };
+  }
+  // An upload that stopped half way resumes from the bytes already stored.
+  for (let at = stored.data.length; at < bytes.length; at += CHUNK) {
+    await program.methods
+      .writeModule(Buffer.from(bytes.subarray(at, at + CHUNK)))
+      .accounts({ module, uploader: owner.publicKey })
+      .rpc();
+    sent += 1;
+  }
+  return { hash, module, sent };
+}
+
+async function publish(args) {
+  const owner = loadKeypair(args[0]);
+  if (!args[1] || !existsSync(args[1])) fail("usage: node cli.mjs publish <keypair.json> <file.wasm>");
+  const program = connect(owner);
+  const { hash, module, sent } = await publishModule(program, owner, readFileSync(args[1]));
+  console.log(`module ${hash}`);
+  console.log(sent ? `stored at ${module.toBase58()} in ${sent} transactions` : `already on chain at ${module.toBase58()}`);
+}
+
 function wasmHash(value) {
   if (!value || value === true) fail("--wasm needs a .wasm file or a 64-character SHA-256.");
   if (/^[0-9a-f]{64}$/i.test(value)) return value.toLowerCase();
@@ -130,6 +171,10 @@ async function request(args) {
     await call.simulate();
     console.log("dry run passed. Nothing was sent.");
     return;
+  }
+  if (typeof opts.wasm === "string" && existsSync(opts.wasm)) {
+    const { sent } = await publishModule(program, requester, readFileSync(opts.wasm));
+    console.log(sent ? `module stored on chain in ${sent} transactions` : "module already on chain");
   }
   console.log(`signature ${await call.rpc()}`);
   console.log(`follow it with: node cli.mjs status ${taskId}`);
@@ -184,6 +229,6 @@ async function nodes() {
 }
 
 const [command, ...rest] = process.argv.slice(2);
-const run = { request, stake, status, nodes }[command];
+const run = { request, publish, stake, status, nodes }[command];
 if (!run) usage();
 run(rest).catch((err) => fail(err?.message?.split("\n")[0] || String(err)));

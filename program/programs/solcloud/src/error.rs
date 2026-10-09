@@ -50,4 +50,12 @@ pub enum SolCloudError {
     SeedSlotInFuture,
     #[msg("That seed slot is too old. Review the request again.")]
     SeedSlotExpired,
+    #[msg("A module must be between 1 and 10000 bytes.")]
+    BadModuleSize,
+    #[msg("This module is already complete.")]
+    ModuleSealed,
+    #[msg("That chunk runs past the module's size.")]
+    ModuleOverflow,
+    #[msg("The uploaded bytes do not hash to the module's SHA-256.")]
+    ModuleHashMismatch,
 }

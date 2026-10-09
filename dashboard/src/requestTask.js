@@ -875,6 +875,70 @@ export async function sendSigned(signed, blockhash, lastValidBlockHeight) {
   return signature;
 }
 
+// ---- Wasm modules stored on chain, so any node can fetch the code a task names ----
+
+export const MAX_MODULE_BYTES = 10_000;
+// Bytes of the module per write. A transaction holds about 1 KB.
+const MODULE_CHUNK = 900;
+
+export function modulePda(uploader, hashHex) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("module"), new PublicKey(uploader).toBuffer(), Buffer.from(hashHex, "hex")],
+    PROGRAM_ID
+  )[0];
+}
+
+// How much of this uploader's module is on chain. `written` lets an upload resume.
+export async function readModule(uploader, hashHex) {
+  const info = await readAccount(modulePda(uploader, hashHex));
+  if (!info) return { exists: false, sealed: false, written: 0 };
+  const data = Buffer.from(info.data);
+  return { exists: true, sealed: data[76] === 1, written: data.readUInt32LE(78) };
+}
+
+// The transactions that finish the upload: create the account if needed, then the missing chunks in order.
+export async function buildModuleUpload({ uploader, bytes, hashHex }) {
+  if (bytes.length === 0 || bytes.length > MAX_MODULE_BYTES) {
+    throw new Error(`A module must be between 1 and ${MAX_MODULE_BYTES} bytes.`);
+  }
+  const owner = new PublicKey(uploader);
+  const module = modulePda(uploader, hashHex);
+  const state = await readModule(uploader, hashHex);
+  if (state.sealed) return { txs: [], blockhash: null, lastValidBlockHeight: null };
+
+  const steps = [];
+  if (!state.exists) {
+    steps.push(
+      new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          { pubkey: module, isSigner: false, isWritable: true },
+          { pubkey: owner, isSigner: true, isWritable: true },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data: concat([await discriminator("create_module"), Buffer.from(hashHex, "hex"), u32(bytes.length)]),
+      })
+    );
+  }
+  const writeTag = await discriminator("write_module");
+  for (let at = state.written; at < bytes.length; at += MODULE_CHUNK) {
+    const chunk = bytes.subarray(at, at + MODULE_CHUNK);
+    steps.push(
+      new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          { pubkey: module, isSigner: false, isWritable: true },
+          { pubkey: owner, isSigner: true, isWritable: false },
+        ],
+        data: concat([writeTag, u32(chunk.length), chunk]),
+      })
+    );
+  }
+  const { blockhash, lastValidBlockHeight } = await withRetries(() => connection.getLatestBlockhash("confirmed"));
+  const txs = steps.map((ix) => new Transaction({ feePayer: owner, recentBlockhash: blockhash }).add(ix));
+  return { txs, blockhash, lastValidBlockHeight };
+}
+
 export function explorerTx(signature) {
   return `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
 }

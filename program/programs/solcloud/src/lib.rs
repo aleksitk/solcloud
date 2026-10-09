@@ -505,6 +505,45 @@ pub mod solcloud {
         )?;
         Ok(())
     }
+
+    /// Reserve an account for a Wasm module. The bytes follow in `write_module`.
+    pub fn create_module(ctx: Context<CreateModule>, wasm_hash: [u8; 32], size: u32) -> Result<()> {
+        let module = &mut ctx.accounts.module;
+        module.uploader = ctx.accounts.uploader.key();
+        module.wasm_hash = wasm_hash;
+        module.size = size;
+        module.sealed = false;
+        module.bump = ctx.bumps.module;
+        module.data = Vec::new();
+        Ok(())
+    }
+
+    /// Append the next bytes. The last chunk must make the whole module hash to
+    /// `wasm_hash`, or the transaction fails and the module stays open.
+    pub fn write_module(ctx: Context<WriteModule>, chunk: Vec<u8>) -> Result<()> {
+        let module = &mut ctx.accounts.module;
+        require!(!module.sealed, SolCloudError::ModuleSealed);
+        require!(
+            module.data.len() + chunk.len() <= module.size as usize,
+            SolCloudError::ModuleOverflow
+        );
+        module.data.extend_from_slice(&chunk);
+        if module.data.len() == module.size as usize {
+            require!(
+                sha256(&module.data) == module.wasm_hash,
+                SolCloudError::ModuleHashMismatch
+            );
+            module.sealed = true;
+        }
+        Ok(())
+    }
+
+    /// Give up on an upload that never completed and take the rent back.
+    /// A sealed module stays: tasks may already name it.
+    pub fn close_module(ctx: Context<CloseModule>) -> Result<()> {
+        require!(!ctx.accounts.module.sealed, SolCloudError::ModuleSealed);
+        Ok(())
+    }
 }
 
 fn load_node(acc: &AccountInfo, program_id: &Pubkey) -> Result<NodeAccount> {
@@ -823,6 +862,49 @@ pub struct RefundExpired<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(wasm_hash: [u8; 32], size: u32)]
+pub struct CreateModule<'info> {
+    #[account(
+        init,
+        payer = uploader,
+        space = 8 + ModuleAccount::BASE_SPACE + size as usize,
+        seeds = [MODULE_SEED, uploader.key().as_ref(), wasm_hash.as_ref()],
+        bump,
+        constraint = size > 0 && size as usize <= MAX_MODULE_LEN @ SolCloudError::BadModuleSize
+    )]
+    pub module: Account<'info, ModuleAccount>,
+    #[account(mut)]
+    pub uploader: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct WriteModule<'info> {
+    #[account(
+        mut,
+        seeds = [MODULE_SEED, uploader.key().as_ref(), module.wasm_hash.as_ref()],
+        bump = module.bump,
+        has_one = uploader
+    )]
+    pub module: Account<'info, ModuleAccount>,
+    pub uploader: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CloseModule<'info> {
+    #[account(
+        mut,
+        close = uploader,
+        seeds = [MODULE_SEED, uploader.key().as_ref(), module.wasm_hash.as_ref()],
+        bump = module.bump,
+        has_one = uploader
+    )]
+    pub module: Account<'info, ModuleAccount>,
+    #[account(mut)]
+    pub uploader: Signer<'info>,
 }
 
 #[cfg(test)]

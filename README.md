@@ -112,7 +112,13 @@ node cli.mjs status 14
 node cli.mjs nodes
 ```
 
-`--wasm` takes a compiled file or its SHA-256. `--input` is hex bytes. `--dry-run` simulates `request` or `stake` without sending.
+Given a file, `request` first stores the module on chain (`publish` does only that). `--wasm` also takes the SHA-256 of a module already there. `--input` is hex bytes. `--dry-run` simulates `request` or `stake` without sending.
+
+## Where the Wasm lives
+
+A requester stores the compiled module in a program account, seeded by their key and the module SHA-256. `create_module` reserves it, `write_module` appends about 900 bytes per transaction, and the last write must make the bytes hash to the name or it fails. A module is capped at 10,000 bytes.
+
+A node looks for a task's module on its own disk, then in the requester's account on chain, then at `SOLCLOUD_WASM_BASE`. It checks the SHA-256 before it runs anything.
 
 `worker/start-nodes.sh` starts one listener for each `~/.config/solana/solcloud-node*.json`, or for the keypairs named, and restarts any that exits.
 

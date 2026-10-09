@@ -11,7 +11,7 @@
   --sunk: #181c25;
   --ink: #f1f3f5;
   --ink-2: #a3abb6;
-  --ink-3: #6c7480;
+  --ink-3: #868e9a;
   --on-ink: #07090c;
   --line: rgba(255, 255, 255, 0.08);
   --line-2: rgba(255, 255, 255, 0.16);
@@ -31,8 +31,10 @@
   color-scheme: dark;
 }
 
-html {
-  scroll-behavior: smooth;
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 html,
@@ -459,7 +461,7 @@ h3 {
 /* ---------- home: hero ---------- */
 
 .hero {
-  padding: 72px 0 40px;
+  padding: 56px 0 48px;
 }
 
 .hero-inner {
@@ -543,9 +545,9 @@ h3 {
 
 .phases li {
   list-style: none;
-  color: #5c6570;
+  color: #7b838e;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   transition: color 0.4s ease;
@@ -621,7 +623,7 @@ h3 {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.07);
   color: var(--dark-ink-2);
-  font-size: 11px;
+  font-size: 12px;
   text-align: center;
   transition: background 0.3s ease, color 0.3s ease;
 }
@@ -658,8 +660,8 @@ h3 {
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  margin-top: 64px;
-  border-block: 1px solid var(--line);
+  margin: 0;
+  border-top: 1px solid var(--line);
 }
 
 .stats div {
@@ -1073,7 +1075,7 @@ h3 {
   background: var(--sunk);
   color: var(--ink-2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 500;
 }
@@ -1596,6 +1598,7 @@ label.field input {
 
 .fn-editor-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 10px 12px 10px 18px;
@@ -1613,7 +1616,7 @@ label.field input {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--dark-ink-2);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .fn-state.on {
@@ -1653,6 +1656,7 @@ label.field input {
 
 .fn-editor-foot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -1947,7 +1951,7 @@ label.field input {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .shell {
     width: calc(100% - 32px);
   }
@@ -2374,4 +2378,142 @@ label.field input {
   .roles {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ---------- home: stats band ---------- */
+
+.paths {
+  margin-top: 8px;
+}
+
+.stats-band {
+  margin-top: 72px;
+}
+
+.stats-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* ---------- task flow ---------- */
+
+.flow {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow li {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-3);
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.flow li i {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-style: normal;
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.flow li.on {
+  color: var(--ink);
+}
+
+.flow li.on i {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.flow li.done {
+  color: var(--ink-2);
+}
+
+.flow li.done i {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-ink);
+}
+
+/* ---------- round progress ---------- */
+
+.meters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin-top: 18px;
+}
+
+.meters div {
+  min-width: 150px;
+}
+
+.meters span {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.meters i {
+  display: block;
+  height: 4px;
+  margin-top: 8px;
+  border-radius: 4px;
+  background: var(--line-2);
+  overflow: hidden;
+}
+
+.meters b {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  transform-origin: left;
+  animation: fill 0.9s var(--ease) both;
+  transition: width 0.6s var(--ease);
+}
+
+@keyframes fill {
+  from { transform: scaleX(0); }
+  to { transform: none; }
+}
+
+/* Rows arrive one after another, once. */
+.table-row {
+  animation: rise 0.45s var(--ease) both;
+}
+
+.table-row:nth-child(3) { animation-delay: 0.04s; }
+.table-row:nth-child(4) { animation-delay: 0.08s; }
+.table-row:nth-child(5) { animation-delay: 0.12s; }
+.table-row:nth-child(n + 6) { animation-delay: 0.16s; }
+
+@media (max-width: 900px) {
+  .btn.small,
+  .tabs button,
+  .seg button {
+    min-height: 40px;
+  }
+}
+
+.footer-row a {
+  padding: 8px 0;
 }

@@ -7,7 +7,6 @@ import { MazeSummary, MazeView } from "./MazePath.jsx";
 import MyRequests from "./MyRequests.jsx";
 import NetworkStats from "./NetworkStats.jsx";
 import NodeBrowser from "./NodeBrowser.jsx";
-import NodeList from "./NodeList.jsx";
 import RoundHistory from "./RoundHistory.jsx";
 import RoundStatus from "./RoundStatus.jsx";
 import StakeForm from "./StakeForm.jsx";
@@ -25,13 +24,6 @@ const NAV = [
   ["docs", "Docs"],
 ];
 const VIEWS = new Set(["home", "network", "compute", "operate", "docs", "map"]);
-
-const STEPS = [
-  ["01", "Request", "A wallet locks the reward. The program draws the committee."],
-  ["02", "Commit", "Each node posts a hash. The output stays hidden."],
-  ["03", "Reveal", "The output opens. It has to match the commit."],
-  ["04", "Settle", "The majority is paid. A mismatch loses stake."],
-];
 
 function explorerAddress(address) {
   return `https://explorer.solana.com/address/${address}?cluster=devnet`;
@@ -113,98 +105,37 @@ function Home({ go }) {
               the chain pays them for it.
             </p>
             <div className="hero-actions">
-              <button type="button" className="btn" onClick={() => go("compute")}>
-                Run a task <span className="arrow">→</span>
-              </button>
               <button type="button" className="btn ghost" onClick={() => go("docs")}>
-                How it works
+                How it works <span className="arrow">→</span>
               </button>
             </div>
           </div>
           <Committee />
         </div>
-        <NetworkStats />
       </section>
 
-      <Reveal className="shell section">
-        <div className="section-head">
-          <div>
-            <p className="kicker">Two ways in</p>
-            <h2>Which one are you?</h2>
-          </div>
-        </div>
-        <div className="paths">
-          <article className="path-card">
-            <p className="kicker">I have code to run</p>
-            <h3>Run a task.</h3>
-            <p>Write a small program, pick how many nodes check it, and set a reward.</p>
-            <ul>
-              <li>Write the code in the browser</li>
-              <li>You pay only when a majority agrees</li>
-              <li>A round that stalls gives the reward back</li>
-            </ul>
-            <button type="button" className="btn" onClick={() => go("compute")}>
-              Run a task <span className="arrow">→</span>
-            </button>
-          </article>
-          <article className="path-card dark">
-            <p className="kicker" style={{ color: "var(--mint)" }}>
-              I have a machine
-            </p>
-            <h3>Run a node.</h3>
-            <p>Stake once and leave one program running. It earns a share of every task it gets right.</p>
-            <ul>
-              <li>Stake from your wallet</li>
-              <li>One command starts the node</li>
-              <li>A wrong answer costs part of the stake</li>
-            </ul>
-            <button type="button" className="btn" onClick={() => go("operate")}>
-              Run a node <span className="arrow">→</span>
-            </button>
-          </article>
-        </div>
-      </Reveal>
-
-      <Reveal className="shell section">
-        <div className="section-head">
-          <div>
-            <p className="kicker">How a round works</p>
-            <h2>Four moves. One majority.</h2>
-          </div>
-          <p>No node sees another node's answer before it has locked in its own.</p>
-        </div>
-        <ol className="steps">
-          {STEPS.map(([index, title, copy]) => (
-            <li key={index}>
-              <span>{index}</span>
-              <strong>{title}</strong>
-              <p>{copy}</p>
-            </li>
-          ))}
-        </ol>
-      </Reveal>
-
-      <Reveal className="shell section">
-        <div className="section-head">
-          <div>
-            <p className="kicker">Network</p>
-            <h2>Live on devnet.</h2>
-          </div>
-          <button type="button" className="btn ghost" onClick={() => go("network")}>
-            Open the explorer <span className="arrow">→</span>
+      <section className="shell paths">
+        <article className="path-card">
+          <p className="kicker">I have code to run</p>
+          <h3>Run a task.</h3>
+          <p>Write a small program, pick how many nodes check it, and set a reward.</p>
+          <button type="button" className="btn" onClick={() => go("compute")}>
+            Run a task <span className="arrow">→</span>
           </button>
-        </div>
-        <div className="split">
-          <div className="card flush">
-            <RoundStatus />
-            <RoundHistory limit={5} />
-          </div>
-          <div className="card flush">
-            <NodeList />
-          </div>
-        </div>
-      </Reveal>
+        </article>
+        <article className="path-card dark">
+          <p className="kicker">I have a machine</p>
+          <h3>Run a node.</h3>
+          <p>Stake once and leave one program running. It earns a share of every task it gets right.</p>
+          <button type="button" className="btn" onClick={() => go("operate")}>
+            Run a node <span className="arrow">→</span>
+          </button>
+        </article>
+      </section>
 
+      <Reveal className="shell">
+        <NetworkStats onOpen={() => go("network")} />
+      </Reveal>
     </>
   );
 }

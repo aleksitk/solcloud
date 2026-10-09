@@ -213,10 +213,28 @@ async function send(taskId, label, build, landed) {
   }
 }
 
-async function ensureModule(hash) {
+// A requester can store the module on chain, under their own key and its hash.
+// Returns the bytes only when the upload is complete and they hash to `hash`.
+async function moduleFromChain(hash, requester) {
+  const key = pda(Buffer.from("module"), requester.toBuffer(), Buffer.from(hash, "hex"));
+  const stored = await program.account.moduleAccount.fetchNullable(key);
+  if (!stored || !stored.sealed) return null;
+  const bytes = Buffer.from(stored.data);
+  if (createHash("sha256").update(bytes).digest("hex") !== hash) return null;
+  return bytes;
+}
+
+// Where a module comes from, in order: this machine, the chain, then the HTTP base.
+async function ensureModule(hash, requester) {
   const file = moduleFile(hash);
   if (existsSync(file)) return { file, downloaded: false };
-  if (!wasmBase) throw new Error(`No local wasm for ${hash}, and SOLCLOUD_WASM_BASE is unset.`);
+  const onChain = await moduleFromChain(hash, requester).catch(() => null);
+  if (onChain) {
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, onChain);
+    return { file, downloaded: true };
+  }
+  if (!wasmBase) throw new Error(`No wasm for ${hash} on this machine or on chain, and SOLCLOUD_WASM_BASE is unset.`);
   const root = wasmBase.endsWith("/") ? wasmBase : `${wasmBase}/`;
   const url = new URL(`${hash}.wasm`, root);
   if (url.protocol !== "https:" && url.protocol !== "http:") {
@@ -239,7 +257,7 @@ async function prepare(task, taskId) {
   let file = "";
   let downloaded = false;
   try {
-    ({ file, downloaded } = await ensureModule(wasmHash));
+    ({ file, downloaded } = await ensureModule(wasmHash, task.account.requester));
     const output = Buffer.from(await runWasm({ file, hash: wasmHash, input }));
     const nonce = randomBytes(8).readBigUInt64LE();
     writeState(taskId, output, nonce);

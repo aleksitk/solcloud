@@ -199,7 +199,14 @@ export default function StakeForm() {
             ["listener", "Listener"],
             ["check", "Machine check"],
           ].map(([id, label]) => (
-            <button key={id} type="button" role="tab" className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              className={tab === id ? "on" : ""}
+              onClick={() => setTab(id)}
+            >
               {label}
             </button>
           ))}

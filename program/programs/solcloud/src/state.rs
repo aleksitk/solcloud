@@ -105,6 +105,25 @@ pub struct CommitAccount {
     pub revealed_at: i64,
 }
 
+/// A Wasm module stored on chain so any node can fetch it
+/// (PDA, seed = "module" ++ uploader ++ wasm_hash).
+#[account]
+pub struct ModuleAccount {
+    pub uploader: Pubkey,
+    pub wasm_hash: [u8; 32],
+    /// Full length of the module in bytes.
+    pub size: u32,
+    /// True once every byte is in and sha256(data) equals wasm_hash.
+    pub sealed: bool,
+    pub bump: u8,
+    pub data: Vec<u8>,
+}
+
+impl ModuleAccount {
+    /// Everything except the bytes: uploader, hash, size, sealed, bump, vec length.
+    pub const BASE_SPACE: usize = 32 + 32 + 4 + 1 + 1 + 4;
+}
+
 /// The finalized, verified result of a task (PDA, seed = "result" ++ task).
 #[account]
 #[derive(InitSpace)]

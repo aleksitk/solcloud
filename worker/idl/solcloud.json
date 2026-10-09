@@ -8,6 +8,62 @@
   },
   "instructions": [
     {
+      "name": "close_module",
+      "docs": [
+        "Give up on an upload that never completed and take the rent back.",
+        "A sealed module stays: tasks may already name it."
+      ],
+      "discriminator": [
+        199,
+        185,
+        56,
+        7,
+        3,
+        32,
+        206,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "module",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "uploader"
+              },
+              {
+                "kind": "account",
+                "path": "module.wasm_hash",
+                "account": "ModuleAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "uploader",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "module"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "commit_result",
       "docs": [
         "A committee node submits `sha256(output ‖ nonce_le)` without revealing yet."
@@ -97,6 +153,75 @@
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "create_module",
+      "docs": [
+        "Reserve an account for a Wasm module. The bytes follow in `write_module`."
+      ],
+      "discriminator": [
+        74,
+        150,
+        3,
+        191,
+        94,
+        127,
+        118,
+        158
+      ],
+      "accounts": [
+        {
+          "name": "module",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "uploader"
+              },
+              {
+                "kind": "arg",
+                "path": "wasm_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "uploader",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "wasm_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "size",
+          "type": "u32"
         }
       ]
     },
@@ -701,6 +826,66 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "write_module",
+      "docs": [
+        "Append the next bytes. The last chunk must make the whole module hash to",
+        "`wasm_hash`, or the transaction fails and the module stays open."
+      ],
+      "discriminator": [
+        26,
+        154,
+        234,
+        74,
+        117,
+        172,
+        35,
+        178
+      ],
+      "accounts": [
+        {
+          "name": "module",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "uploader"
+              },
+              {
+                "kind": "account",
+                "path": "module.wasm_hash",
+                "account": "ModuleAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "uploader",
+          "signer": true,
+          "relations": [
+            "module"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "chunk",
+          "type": "bytes"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -728,6 +913,19 @@
         250,
         204,
         130
+      ]
+    },
+    {
+      "name": "ModuleAccount",
+      "discriminator": [
+        133,
+        79,
+        41,
+        127,
+        120,
+        138,
+        143,
+        83
       ]
     },
     {
@@ -890,6 +1088,26 @@
       "code": 6023,
       "name": "SeedSlotExpired",
       "msg": "That seed slot is too old. Review the request again."
+    },
+    {
+      "code": 6024,
+      "name": "BadModuleSize",
+      "msg": "A module must be between 1 and 10000 bytes."
+    },
+    {
+      "code": 6025,
+      "name": "ModuleSealed",
+      "msg": "This module is already complete."
+    },
+    {
+      "code": 6026,
+      "name": "ModuleOverflow",
+      "msg": "That chunk runs past the module's size."
+    },
+    {
+      "code": 6027,
+      "name": "ModuleHashMismatch",
+      "msg": "The uploaded bytes do not hash to the module's SHA-256."
     }
   ],
   "types": [
@@ -1011,6 +1229,53 @@
             "type": {
               "vec": "pubkey"
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ModuleAccount",
+      "docs": [
+        "A Wasm module stored on chain so any node can fetch it",
+        "(PDA, seed = \"module\" ++ uploader ++ wasm_hash)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "uploader",
+            "type": "pubkey"
+          },
+          {
+            "name": "wasm_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "size",
+            "docs": [
+              "Full length of the module in bytes."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "sealed",
+            "docs": [
+              "True once every byte is in and sha256(data) equals wasm_hash."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
           }
         ]
       }

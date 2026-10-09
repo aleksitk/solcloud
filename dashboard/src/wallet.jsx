@@ -144,9 +144,21 @@ export function WalletProvider({ children }) {
     return signed || tx;
   }
 
+  // One approval for several transactions when the wallet supports it.
+  async function signAllTransactions(txs) {
+    const provider = providerRef.current;
+    if (!provider?.signTransaction) {
+      throw new Error("Connect a Devnet wallet first.");
+    }
+    if (provider.signAllTransactions) return (await provider.signAllTransactions(txs)) || txs;
+    const signed = [];
+    for (const tx of txs) signed.push((await provider.signTransaction(tx)) || tx);
+    return signed;
+  }
+
   return (
     <WalletContext.Provider
-      value={{ address, balance, note, setNote, connect, disconnect, signTransaction, refreshBalance }}
+      value={{ address, balance, note, setNote, connect, disconnect, signTransaction, signAllTransactions, refreshBalance }}
     >
       {children}
     </WalletContext.Provider>

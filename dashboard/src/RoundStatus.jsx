@@ -53,6 +53,23 @@ export default function RoundStatus({ taskId, label = "Latest round", compact = 
           {round.status}
         </h2>
         <p>{describeRound(round)}</p>
+        {!compact && (
+          <div className="meters">
+            {[
+              ["Commits", round.commits],
+              ["Reveals", round.reveals],
+            ].map(([name, count]) => (
+              <div key={name}>
+                <span>
+                  {name} {count}/{round.committee}
+                </span>
+                <i>
+                  <b style={{ width: `${(count / round.committee) * 100}%` }} />
+                </i>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <a href={explorerAddress(round.address)} target="_blank" rel="noreferrer">
         Round {round.id} ↗

@@ -64,7 +64,8 @@ export default function Docs({ go }) {
                 <button type="button" className="text-link" onClick={() => go("compute")}>
                   Run a task
                 </button>
-                . Write the code and press Compile, or pick the example.
+                . Write the code, press Compile, then Publish. Publish stores the compiled program on Solana so
+                every node can fetch it.
               </li>
               <li>Give the input, choose how many nodes run it, and set the reward.</li>
               <li>Press Review, then sign. The round settles on its own, usually in under a minute.</li>
@@ -82,7 +83,8 @@ node cli.mjs request ~/.config/solana/id.json \\
 
 node cli.mjs status 14`}</pre>
             <p>
-              <code>--wasm</code> takes a compiled file or its SHA-256. <code>--input</code> is hex bytes. Add{" "}
+              Given a file, <code>request</code> first stores it on chain. <code>--wasm</code> also takes the
+              SHA-256 of a module that is already there. <code>--input</code> is hex bytes. Add{" "}
               <code>--dry-run</code> to check a request without sending it.
             </p>
           </section>
@@ -134,6 +136,10 @@ node cli.mjs status 14`}</pre>
               <li>
                 <b>No outside world.</b> The program cannot read files or the network.
               </li>
+              <li>
+                <b>Stored on chain.</b> The compiled program lives in a Solana account. A node downloads it and
+                checks its SHA-256 before it runs it.
+              </li>
             </ul>
           </section>
 
@@ -167,9 +173,10 @@ node cli.mjs status 14`}</pre>
               <li>This runs on Solana Devnet. The SOL has no value.</li>
               <li>Security is an honest majority plus stake. It is not a cryptographic proof.</li>
               <li>One person can stake several nodes. Larger committees make that harder to exploit.</li>
+              <li>A program is capped at 10,000 bytes of Wasm. It is stored in one Solana account.</li>
               <li>
-                Code written in the editor is compiled and stored on the machine that serves this site. Nodes on
-                other machines can run the built-in example, and cannot yet download custom code.
+                Compile works when this site is served from a developer machine. On the public site, build the
+                .wasm yourself and use Upload .wasm.
               </li>
             </ul>
           </section>

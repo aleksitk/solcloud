@@ -40,7 +40,7 @@ function shortError(err) {
 
 export default function LaunchForm({ onOpenRequests }) {
   const wallet = useWallet();
-  const { compiled } = useFunctionChoice();
+  const { compiled, published } = useFunctionChoice();
   const [mode, setMode] = useState("code");
   const [inputHex, setInputHex] = useState("05000000");
   const [size, setSize] = useState(3);
@@ -87,7 +87,7 @@ export default function LaunchForm({ onOpenRequests }) {
   const custom = mode === "code";
   const inputBytes = hexBytes(inputHex);
   const inputOk = custom
-    ? Boolean(compiled) && inputBytes !== null
+    ? Boolean(compiled) && published && inputBytes !== null
     : Number.isInteger(seedNum) && seedNum >= 0 && Number.isInteger(mazeNum) && mazeNum > 0;
   const valid = rewardNum > 0 && inputOk && activeCount !== null && !needsMoreNodes;
 
@@ -265,15 +265,27 @@ export default function LaunchForm({ onOpenRequests }) {
 
   const busy = phase === "preparing" || phase === "signing" || phase === "sending";
 
+  const flow = custom ? ["Compile", "Publish", "Review", "Sign"] : ["Choose", "Review", "Sign"];
+  const before = custom ? (!compiled ? 0 : !published ? 1 : 2) : 1;
+  const at = result ? flow.length : review ? flow.length - 1 : before;
+
   return (
     <div className="work">
+      <ol className="flow" aria-label="Progress">
+        {flow.map((name, index) => (
+          <li key={name} className={index < at ? "done" : index === at ? "on" : ""}>
+            <i>{index < at ? "✓" : index + 1}</i>
+            {name}
+          </li>
+        ))}
+      </ol>
       <form className="card" onSubmit={onSubmit}>
         <div className="field-group">
           <div className="field-title">
             <i>1</i>
             Code
           </div>
-          <div className="seg" role="tablist">
+          <div className="seg">
             <button
               type="button"
               className={custom ? "on" : ""}
@@ -401,7 +413,9 @@ export default function LaunchForm({ onOpenRequests }) {
         <button className="btn" type="submit" disabled={!valid || phase === "reading" || busy}>
           {phase === "reading" ? "Reading nodes…" : "Review"}
         </button>
-        {custom && !compiled && <p className="hint">Compile the code first.</p>}
+        {custom && !(compiled && published) && (
+          <p className="hint">{compiled ? "Publish the code first." : "Compile the code first."}</p>
+        )}
         {error && !review && <p className="form-error">{error}</p>}
       </form>
 
