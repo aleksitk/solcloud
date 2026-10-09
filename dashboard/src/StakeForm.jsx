@@ -12,6 +12,7 @@ import {
 } from "./requestTask.js";
 import EnvCheck from "./EnvCheck.jsx";
 import NodeHistory from "./NodeHistory.jsx";
+import { ListenerSetup } from "./Setup.jsx";
 import { useWallet } from "./wallet.jsx";
 
 function solLabel(lamports) {
@@ -37,6 +38,7 @@ export default function StakeForm() {
   const [phase, setPhase] = useState("idle");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState("rounds");
 
   useEffect(() => {
     let live = true;
@@ -140,63 +142,93 @@ export default function StakeForm() {
     }
   }
 
-  return (
-    <section className="shell launch">
-      <p className="kicker">{existing ? "Operator" : "Join"}</p>
-      <h1>{existing ? "My node." : "Stake a node."}</h1>
-      <p className="lede">
-        {existing
-          ? "Stake, status, and the rounds this node won or lost. The chain writes these when a round settles."
-          : `Lock at least ${solLabel(minStake)} SOL from this wallet. That wallet becomes a node on devnet. The stake stays in the node account.`}
-      </p>
+  const busy = phase === "preparing" || phase === "signing" || phase === "sending";
 
-      <EnvCheck />
+  if (lookup !== "ready") {
+    return (
+      <div className="card">
+        <p className="hint" style={{ marginTop: 0 }}>
+          Reading this wallet's node…
+        </p>
+      </div>
+    );
+  }
 
-      {lookup === "reading" ? (
-        <p className="hint">Reading this wallet's node…</p>
-      ) : existing ? (
-        <div className="mine">
-          <div className="ledger-head">
-            <h2>My node</h2>
-            <span className="status">
-              <b>
-                <i className={existing.tone} />
-                {existing.status}
-              </b>
-            </span>
-          </div>
-          <dl className="mine-stats">
-            <div>
-              <dt>Stake</dt>
-              <dd>{solLabel(existing.stake)} SOL</dd>
-            </div>
-            <div>
-              <dt>Completed</dt>
-              <dd>{existing.completed.toString()}</dd>
-            </div>
-            <div>
-              <dt>Slashed</dt>
-              <dd>{existing.slashed.toString()}</dd>
-            </div>
-            <div>
-              <dt>Success</dt>
-              <dd className={existing.success.endsWith("%") ? undefined : "words"}>{existing.success}</dd>
-            </div>
-            <div>
-              <dt>Average</dt>
-              <dd>{rounds ? averageCompletion(rounds) : "—"}</dd>
-            </div>
-          </dl>
-          <p className="hint">
-            <a href={`https://explorer.solana.com/address/${existing.address}?cluster=devnet`} target="_blank" rel="noreferrer">
-              View the node account
-            </a>
-          </p>
+  if (existing) {
+    return (
+      <>
+        <div className="node-bar">
+          <span className="badge">
+            <i className={`dot ${existing.tone}`} />
+            {existing.status}
+          </span>
+          <a
+            className="text-link"
+            href={`https://explorer.solana.com/address/${existing.address}?cluster=devnet`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Node account ↗
+          </a>
         </div>
-      ) : (
-        <form className="launch-form" onSubmit={onSubmit}>
+        <dl className="tiles">
+          <div>
+            <dt>Stake</dt>
+            <dd>{solLabel(existing.stake)} SOL</dd>
+          </div>
+          <div>
+            <dt>Completed</dt>
+            <dd>{existing.completed.toString()}</dd>
+          </div>
+          <div>
+            <dt>Slashed</dt>
+            <dd>{existing.slashed.toString()}</dd>
+          </div>
+          <div>
+            <dt>Success</dt>
+            <dd className={existing.success.endsWith("%") ? undefined : "words"}>{existing.success}</dd>
+          </div>
+          <div>
+            <dt>Average reveal</dt>
+            <dd>{rounds ? averageCompletion(rounds) : "—"}</dd>
+          </div>
+        </dl>
+        <div className="tabs" role="tablist">
+          {[
+            ["rounds", "Rounds"],
+            ["listener", "Listener"],
+            ["check", "Machine check"],
+          ].map(([id, label]) => (
+            <button key={id} type="button" role="tab" className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="tab-body" key={tab}>
+          {tab === "rounds" ? (
+            <NodeHistory rows={rounds} note={roundsNote} />
+          ) : tab === "listener" ? (
+            <div className="card">
+              <ListenerSetup />
+            </div>
+          ) : (
+            <EnvCheck />
+          )}
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="work">
+      <div>
+        <form className="card" onSubmit={onSubmit}>
+          <div className="field-title">
+            <i>1</i>
+            Stake
+          </div>
           <label className="stake-field">
-            Stake, SOL
+            Amount, SOL
             <input
               inputMode="decimal"
               value={stake}
@@ -209,27 +241,48 @@ export default function StakeForm() {
               }}
             />
           </label>
-          <p className="hint">Minimum is {solLabel(minStake)} SOL.</p>
-          <button className="submit" type="submit" disabled={!valid || phase === "preparing" || phase === "signing" || phase === "sending"}>
-            Review stake
-          </button>
-        </form>
-      )}
-
-      {existing ? <NodeHistory rows={rounds} note={roundsNote} /> : null}
-
-      {review && !existing && (
-        <div className="review">
-          <p>
-            Lock <b>{review.stake} SOL</b>. The wallet signs this on Devnet.
+          <p className="hint">
+            Minimum is {solLabel(minStake)} SOL. The stake stays in the node account. A wrong answer loses part of it.
           </p>
-          {wallet.address ? (
-            <button
-              className="submit"
-              type="button"
-              disabled={phase === "preparing" || phase === "signing" || phase === "sending"}
-              onClick={sign}
-            >
+          <div className="row-actions" style={{ marginTop: 18 }}>
+            <button className="btn" type="submit" disabled={!valid || busy}>
+              Review stake
+            </button>
+          </div>
+        </form>
+        <div className="card">
+          <div className="field-title">
+            <i>2</i>
+            Run the listener
+          </div>
+          <ListenerSetup />
+        </div>
+      </div>
+
+      <aside className="card work-side">
+        <div className="card-head">
+          <h3>Summary</h3>
+          <span>Devnet</span>
+        </div>
+        {!review ? (
+          <p className="hint" style={{ marginTop: 0 }}>
+            Review the stake to see what the wallet will sign.
+          </p>
+        ) : (
+          <>
+            <dl className="summary">
+              <div>
+                <dt>Lock</dt>
+                <dd>{review.stake} SOL</dd>
+              </div>
+              <div>
+                <dt>Owner</dt>
+                <dd>
+                  {wallet.address.slice(0, 4)}…{wallet.address.slice(-4)}
+                </dd>
+              </div>
+            </dl>
+            <button className="btn wide" type="button" disabled={busy} onClick={sign}>
               {phase === "preparing"
                 ? "Preparing the transaction…"
                 : phase === "signing"
@@ -238,20 +291,10 @@ export default function StakeForm() {
                     ? "Confirming on devnet…"
                     : "Sign and stake"}
             </button>
-          ) : (
-            <p>Connect a Devnet wallet to sign.</p>
-          )}
-          {result && (
-            <p>
-              The node is on devnet.{" "}
-              <a href={explorerTx(result.signature)} target="_blank" rel="noreferrer">
-                View the transaction
-              </a>
-            </p>
-          )}
-          {error && <p className="form-error">{error}</p>}
-        </div>
-      )}
-    </section>
+            {error && <p className="form-error">{error}</p>}
+          </>
+        )}
+      </aside>
+    </div>
   );
 }

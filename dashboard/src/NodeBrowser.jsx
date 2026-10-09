@@ -79,22 +79,20 @@ export default function NodeBrowser() {
       })
     : [];
 
-  return (
-    <section className="shell launch browser">
-      <p className="kicker">Network</p>
-      <h1>Nodes.</h1>
-      <p className="lede">
-        Every active node. Success is completed tasks over completed plus slashed. Average is the mean reveal time on finalized rounds. Speed is the top, middle, or bottom third by that average. Sizes are the committees this node can be drawn into.
-      </p>
+  if (!nodes || nodes.length === 0) {
+    return (
+      <div className="card flush">
+        <p className="empty">{note}</p>
+      </div>
+    );
+  }
 
-      {!nodes ? (
-        <p className="hint">{note}</p>
-      ) : nodes.length === 0 ? (
-        <p className="hint">{note}</p>
-      ) : (
-        <>
-          <div className="sheet">
-            <div className="sheet-head">
+  return (
+    <>
+      <div className="card flush">
+        <div className="table-wrap">
+          <div className="table" style={{ "--cols": "minmax(110px, 1.2fr) 1fr 1fr 1fr 1fr 1.2fr 70px", "--min": "760px" }}>
+            <div className="table-head">
               {COLUMNS.map((column) => (
                 <button
                   key={column.key}
@@ -108,30 +106,37 @@ export default function NodeBrowser() {
               <span />
             </div>
             {rows.map((node) => (
-              <a
-                key={node.address}
-                className="sheet-row"
-                href={explorerAddress(node.address)}
-                target="_blank"
-                rel="noreferrer"
-              >
+              <a key={node.address} className="table-row" href={explorerAddress(node.address)} target="_blank" rel="noreferrer">
                 <span className="mono">{node.id}</span>
-                <span className="row-meta">
-                  <span className={node.success.endsWith("%") ? "mono" : "words"}>{node.success}</span>
-                  <span className="mono">{node.average}</span>
-                  <span className="mono">{node.speed}</span>
-                  <span className="mono">{node.stakeText} SOL</span>
-                  <span className="mono">{node.sizesText}</span>
-                  <span className="go">Explorer</span>
-                </span>
+                <span className={node.success.endsWith("%") ? "mono" : "muted"}>{node.success}</span>
+                <span className="mono">{node.average}</span>
+                <span>{node.speed}</span>
+                <span className="mono">{node.stakeText} SOL</span>
+                <span className="mono">{node.sizesText}</span>
+                <span className="go">Explorer ↗</span>
               </a>
             ))}
           </div>
-          <p className="hint">
-            A node joins a committee of 3, 5, 7, 9, or 11 when at least that many nodes are active. Speed has no fixed cutoff. A node with no reveal time is left out of the thirds, so that column stays blank on the rounds already on devnet.
-          </p>
-        </>
-      )}
-    </section>
+        </div>
+      </div>
+      <dl className="legend">
+        <div>
+          <dt>Success</dt>
+          <dd>Completed tasks over completed plus slashed.</dd>
+        </div>
+        <div>
+          <dt>Average</dt>
+          <dd>Mean reveal time on finalized rounds.</dd>
+        </div>
+        <div>
+          <dt>Speed</dt>
+          <dd>Top, middle, or bottom third by that average.</dd>
+        </div>
+        <div>
+          <dt>Sizes</dt>
+          <dd>Committees this node can be drawn into today.</dd>
+        </div>
+      </dl>
+    </>
   );
 }

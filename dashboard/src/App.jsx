@@ -1,32 +1,35 @@
-import { useState } from "react";
-import Aurora from "./Aurora.jsx";
-import Field from "./Field.jsx";
-import FunctionView from "./FunctionView.jsx";
+import { useEffect, useState } from "react";
+import Committee from "./Committee.jsx";
+import Docs from "./Docs.jsx";
+import Gate from "./Gate.jsx";
 import LaunchForm from "./LaunchForm.jsx";
 import { MazeSummary, MazeView } from "./MazePath.jsx";
+import MyRequests from "./MyRequests.jsx";
+import NetworkStats from "./NetworkStats.jsx";
 import NodeBrowser from "./NodeBrowser.jsx";
 import NodeList from "./NodeList.jsx";
 import RoundHistory from "./RoundHistory.jsx";
 import RoundStatus from "./RoundStatus.jsx";
 import StakeForm from "./StakeForm.jsx";
 import WalletButton from "./WalletButton.jsx";
+import { useWallet } from "./wallet.jsx";
 
 const PROGRAM_ID = "D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ";
+const REPO = "https://github.com/aleksitk/solcloud";
 
-const FACTS = [
-  "Commit, then reveal",
-  "Committee of 3, 5, 7, 9, or 11",
-  "Majority is half plus one",
-  "A mismatch loses stake",
-  "The same Wasm on every node",
-  "The reward stays in escrow",
-  "Settled on Solana devnet",
+const NAV = [
+  ["home", "Overview"],
+  ["compute", "Run a task"],
+  ["operate", "Run a node"],
+  ["network", "Network"],
+  ["docs", "Docs"],
 ];
+const VIEWS = new Set(["home", "network", "compute", "operate", "docs", "map"]);
 
 const STEPS = [
-  ["01", "Request", "The wallet locks the reward and names the committee."],
+  ["01", "Request", "A wallet locks the reward. The program draws the committee."],
   ["02", "Commit", "Each node posts a hash. The output stays hidden."],
-  ["03", "Reveal", "The output opens. The hash has to match the commit."],
+  ["03", "Reveal", "The output opens. It has to match the commit."],
   ["04", "Settle", "The majority is paid. A mismatch loses stake."],
 ];
 
@@ -34,180 +37,369 @@ function explorerAddress(address) {
   return `https://explorer.solana.com/address/${address}?cluster=devnet`;
 }
 
-function short(value) {
-  return `${value.slice(0, 4)}…${value.slice(-4)}`;
+function viewFromHash() {
+  const name = window.location.hash.replace(/^#\/?/, "");
+  return VIEWS.has(name) ? name : "home";
 }
 
 function Mark() {
   return (
-    <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
-      <rect x="4" y="6" width="5" height="20" rx="1.5" fill="#1c2128" />
-      <rect x="13.5" y="6" width="5" height="20" rx="1.5" fill="#1c2128" />
-      <rect x="23" y="14" width="5" height="12" rx="1.5" fill="#e07a5f" />
+    <svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true">
+      <rect width="32" height="32" rx="9" fill="#3fe0a2" />
+      <circle cx="11" cy="12" r="3" fill="#07090c" />
+      <circle cx="21" cy="12" r="3" fill="#07090c" />
+      <circle cx="16" cy="21" r="3" fill="#07090c" fillOpacity="0.35" />
     </svg>
   );
 }
 
+function Tabs({ items, value, onChange }) {
+  return (
+    <div className="tabs" role="tablist">
+      {items.map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={value === id}
+          className={value === id ? "on" : ""}
+          onClick={() => onChange(id)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Fade a section in the first time it scrolls into view.
+function Reveal({ className = "", children }) {
+  const [shown, setShown] = useState(false);
+  const [node, setNode] = useState(null);
+
+  useEffect(() => {
+    if (!node) return undefined;
+    const watcher = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setShown(true);
+        watcher.disconnect();
+      },
+      { threshold: 0.12 }
+    );
+    watcher.observe(node);
+    return () => watcher.disconnect();
+  }, [node]);
+
+  return (
+    <section ref={setNode} className={`${className} reveal${shown ? " in" : ""}`}>
+      {children}
+    </section>
+  );
+}
+
+function Home({ go }) {
+  return (
+    <>
+      <section className="shell hero">
+        <div className="hero-inner">
+          <div className="hero-copy">
+            <p className="kicker">Verifiable compute on Solana</p>
+            <h1>
+              Majority is <span>the proof.</span>
+            </h1>
+            <p className="lede">
+              Send code. Several independent nodes run it. The answer most of them agree on is the result, and
+              the chain pays them for it.
+            </p>
+            <div className="hero-actions">
+              <button type="button" className="btn" onClick={() => go("compute")}>
+                Run a task <span className="arrow">→</span>
+              </button>
+              <button type="button" className="btn ghost" onClick={() => go("docs")}>
+                How it works
+              </button>
+            </div>
+          </div>
+          <Committee />
+        </div>
+        <NetworkStats />
+      </section>
+
+      <Reveal className="shell section">
+        <div className="section-head">
+          <div>
+            <p className="kicker">Two ways in</p>
+            <h2>Which one are you?</h2>
+          </div>
+        </div>
+        <div className="paths">
+          <article className="path-card">
+            <p className="kicker">I have code to run</p>
+            <h3>Run a task.</h3>
+            <p>Write a small program, pick how many nodes check it, and set a reward.</p>
+            <ul>
+              <li>Write the code in the browser</li>
+              <li>You pay only when a majority agrees</li>
+              <li>A round that stalls gives the reward back</li>
+            </ul>
+            <button type="button" className="btn" onClick={() => go("compute")}>
+              Run a task <span className="arrow">→</span>
+            </button>
+          </article>
+          <article className="path-card dark">
+            <p className="kicker" style={{ color: "var(--mint)" }}>
+              I have a machine
+            </p>
+            <h3>Run a node.</h3>
+            <p>Stake once and leave one program running. It earns a share of every task it gets right.</p>
+            <ul>
+              <li>Stake from your wallet</li>
+              <li>One command starts the node</li>
+              <li>A wrong answer costs part of the stake</li>
+            </ul>
+            <button type="button" className="btn" onClick={() => go("operate")}>
+              Run a node <span className="arrow">→</span>
+            </button>
+          </article>
+        </div>
+      </Reveal>
+
+      <Reveal className="shell section">
+        <div className="section-head">
+          <div>
+            <p className="kicker">How a round works</p>
+            <h2>Four moves. One majority.</h2>
+          </div>
+          <p>No node sees another node's answer before it has locked in its own.</p>
+        </div>
+        <ol className="steps">
+          {STEPS.map(([index, title, copy]) => (
+            <li key={index}>
+              <span>{index}</span>
+              <strong>{title}</strong>
+              <p>{copy}</p>
+            </li>
+          ))}
+        </ol>
+      </Reveal>
+
+      <Reveal className="shell section">
+        <div className="section-head">
+          <div>
+            <p className="kicker">Network</p>
+            <h2>Live on devnet.</h2>
+          </div>
+          <button type="button" className="btn ghost" onClick={() => go("network")}>
+            Open the explorer <span className="arrow">→</span>
+          </button>
+        </div>
+        <div className="split">
+          <div className="card flush">
+            <RoundStatus />
+            <RoundHistory limit={5} />
+          </div>
+          <div className="card flush">
+            <NodeList />
+          </div>
+        </div>
+      </Reveal>
+
+    </>
+  );
+}
+
+function Network({ go }) {
+  const [tab, setTab] = useState("rounds");
+  return (
+    <div className="shell">
+      <header className="page-head">
+        <p className="kicker">Network</p>
+        <h1>Rounds and nodes.</h1>
+        <p className="lede">Everything here is read from the program's accounts on devnet.</p>
+      </header>
+      <Tabs
+        items={[
+          ["rounds", "Rounds"],
+          ["nodes", "Nodes"],
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+      <div className="tab-body" key={tab}>
+        {tab === "rounds" ? (
+          <div className="card flush">
+            <RoundStatus />
+            <MazeSummary onOpen={() => go("map")} />
+            <RoundHistory />
+          </div>
+        ) : (
+          <NodeBrowser />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Compute() {
+  const wallet = useWallet();
+  const [tab, setTab] = useState("task");
+  return (
+    <div className="shell">
+      <header className="page-head">
+        <p className="kicker">Run a task</p>
+        <h1>Run your code on a committee.</h1>
+        <p className="lede">Write the code, give it an input, set a reward. Your wallet signs once.</p>
+      </header>
+      {!wallet.address ? (
+        <Gate
+          title="Connect a wallet to start"
+          copy="A task is paid from your wallet and settled by the program. Connect a Devnet wallet to create one."
+        />
+      ) : (
+        <>
+          <Tabs
+            items={[
+              ["task", "New task"],
+              ["requests", "My requests"],
+            ]}
+            value={tab}
+            onChange={setTab}
+          />
+          <div className="tab-body" key={tab}>
+            {tab === "task" ? (
+              <LaunchForm onOpenRequests={() => setTab("requests")} />
+            ) : (
+              <MyRequests owner={wallet.address} />
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Operate() {
+  const wallet = useWallet();
+  return (
+    <div className="shell">
+      <header className="page-head">
+        <p className="kicker">Run a node</p>
+        <h1>Earn by checking tasks.</h1>
+        <p className="lede">Stake once, start one program, and leave it running.</p>
+      </header>
+      {!wallet.address ? (
+        <Gate
+          title="Connect the node's wallet"
+          copy="The wallet that stakes owns the node. Connect it to stake, or to see the node it already runs."
+        />
+      ) : (
+        <StakeForm />
+      )}
+    </div>
+  );
+}
+
 export default function App() {
-  const [view, setView] = useState("home");
+  const [view, setView] = useState(viewFromHash);
+  const [menu, setMenu] = useState(false);
+  const [stuck, setStuck] = useState(false);
+
+  useEffect(() => {
+    function onHash() {
+      setView(viewFromHash());
+      setMenu(false);
+      window.scrollTo(0, 0);
+    }
+    function onScroll() {
+      setStuck(window.scrollY > 8);
+    }
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  function go(next) {
+    window.location.hash = next === "home" ? "/" : `/${next}`;
+  }
+
+  const current = view === "map" ? "network" : view;
 
   return (
     <div className="app">
-      <Field />
-      <header className="site-header">
+      <div className="backdrop" aria-hidden="true" />
+      <header className={stuck ? "site-header stuck" : "site-header"}>
         <div className="shell header-row">
-          <button className="brand" type="button" onClick={() => setView("home")}>
+          <button className="brand" type="button" onClick={() => go("home")}>
             <Mark />
             SolCloud
           </button>
-          <nav className="nav">
-            <button type="button" className={view === "home" ? "on" : ""} onClick={() => setView("home")}>
-              Rounds
-            </button>
-            <button type="button" className={view === "nodes" ? "on" : ""} onClick={() => setView("nodes")}>
-              Nodes
-            </button>
-            <button type="button" className={view === "functions" ? "on" : ""} onClick={() => setView("functions")}>
-              Functions
-            </button>
-            <button type="button" className={view === "compute" ? "on" : ""} onClick={() => setView("compute")}>
-              New task
-            </button>
-            <button type="button" className={view === "stake" ? "on" : ""} onClick={() => setView("stake")}>
-              Stake
-            </button>
+          <nav className={menu ? "nav open" : "nav"} aria-label="Main">
+            {NAV.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={current === id ? "on" : ""}
+                aria-current={current === id ? "page" : undefined}
+                onClick={() => go(id)}
+              >
+                {label}
+              </button>
+            ))}
           </nav>
           <div className="header-tools">
-            <a className="program-link" href={explorerAddress(PROGRAM_ID)} target="_blank" rel="noreferrer">
-              Devnet {short(PROGRAM_ID)}
+            <a className="net-pill" href={explorerAddress(PROGRAM_ID)} target="_blank" rel="noreferrer">
+              <i />
+              Devnet
             </a>
             <WalletButton />
+            <button
+              type="button"
+              className="menu-toggle"
+              aria-label="Menu"
+              aria-expanded={menu}
+              onClick={() => setMenu((open) => !open)}
+            >
+              <span />
+              <span />
+            </button>
           </div>
         </div>
       </header>
 
       <main className="page" key={view}>
-      {view === "compute" ? (
-        <>
-          <LaunchForm onOpenFunction={() => setView("functions")} />
-          <NodeBrowser />
-        </>
-      ) : view === "nodes" ? (
-        <NodeBrowser />
-      ) : view === "stake" ? (
-        <StakeForm />
-      ) : view === "functions" ? (
-        <FunctionView onUse={() => setView("compute")} />
-      ) : view === "map" ? (
-        <MazeView onClose={() => setView("home")} />
-      ) : (
-      <>
-      <section className="hero">
-        <Aurora />
-        <div className="hero-shade" />
-        <div className="shell hero-inner">
-          <div className="hero-copy">
-            <p className="kicker">Solana · verifiable compute</p>
-            <h1>Majority is the proof.</h1>
-            <p className="lede">
-              Staked nodes run the same Wasm program. They commit a hash, then reveal
-              the output. The chain pays the majority and slashes the rest.
-            </p>
-          </div>
-          <aside className="monitor" aria-label="How a round is settled">
-            <div className="monitor-top">
-              <span className="live">
-                <i />
-                Devnet round
-              </span>
-              <span>2 of 3</span>
-            </div>
-            <div className="nodes">
-              <div className="node agree">
-                <span className="node-id">Node 1</span>
-                <span className="node-out">35628</span>
-                <span className="node-tag">paid</span>
-              </div>
-              <div className="node agree">
-                <span className="node-id">Node 2</span>
-                <span className="node-out">35628</span>
-                <span className="node-tag">paid</span>
-              </div>
-              <div className="node slash">
-                <span className="node-id">Node 3</span>
-                <span className="node-out">1</span>
-                <span className="node-tag">−0.5 SOL</span>
-              </div>
-            </div>
-            <p className="round-foot">Commit, then reveal. The mismatch loses stake.</p>
-          </aside>
-        </div>
-      </section>
-
-      <div className="marquee">
-        <div className="marquee-track">
-          {[0, 1].map((copy) => (
-            <ul key={copy} aria-hidden={copy === 1}>
-              {FACTS.map((fact) => (
-                <li key={`${copy}-${fact}`}>{fact}</li>
-              ))}
-            </ul>
-          ))}
-        </div>
-      </div>
-
-      <section className="shell flow">
-        <p className="kicker">The round</p>
-        <h2>Four moves. One majority.</h2>
-        <div className="flow-steps">
-          <span className="flow-glow" aria-hidden="true" />
-          <ol>
-            {STEPS.map(([index, title, copy]) => (
-              <li key={index}>
-                <span>{index}</span>
-                <strong>{title}</strong>
-                <p>{copy}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      <section className="shell network">
-        <div className="network-intro">
-          <p className="kicker">Network</p>
-          <h2>Live on devnet.</h2>
-          <p>The open round, the settled history, and the nodes that can be called.</p>
-        </div>
-        <div className="network-grid">
-          <div className="panel">
-            <RoundStatus />
-            <MazeSummary onOpen={() => setView("map")} />
-            <RoundHistory />
-          </div>
-          <div className="panel">
-            <NodeList />
-          </div>
-        </div>
-      </section>
-
-      <section className="shell close">
-        <div>
-          <p className="kicker">Start</p>
-          <h2>Rent out a machine, or run a computation.</h2>
-        </div>
-        <div className="close-actions">
-          <button type="button" className="submit" onClick={() => setView("compute")}>
-            Run a computation
-          </button>
-          <button type="button" className="close-ghost" onClick={() => setView("stake")}>
-            Rent out your hardware
-          </button>
-        </div>
-      </section>
-      </>
-      )}
+        {view === "network" ? (
+          <Network go={go} />
+        ) : view === "compute" ? (
+          <Compute />
+        ) : view === "operate" ? (
+          <Operate />
+        ) : view === "docs" ? (
+          <Docs go={go} />
+        ) : view === "map" ? (
+          <MazeView onClose={() => go("network")} />
+        ) : (
+          <Home go={go} />
+        )}
       </main>
+
+      <footer className="site-footer">
+        <div className="shell footer-row">
+          <span>SolCloud · devnet · honest majority plus stake</span>
+          <nav aria-label="Links">
+            <a href={REPO} target="_blank" rel="noreferrer">
+              GitHub
+            </a>
+            <a href={explorerAddress(PROGRAM_ID)} target="_blank" rel="noreferrer">
+              Program
+            </a>
+            <a href="#/docs">Docs</a>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }

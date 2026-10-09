@@ -101,6 +101,21 @@ sudo cp solcloud-listener.service /etc/systemd/system/
 sudo systemctl enable --now solcloud-listener
 ```
 
+## From a terminal
+
+`worker/cli.mjs` does what the site does, with a keypair file in place of a wallet:
+
+```bash
+node cli.mjs request ~/.config/solana/id.json --wasm my-function.wasm --input 05000000 --reward 0.05 --committee 3
+node cli.mjs stake ~/.config/solana/node.json --sol 1
+node cli.mjs status 14
+node cli.mjs nodes
+```
+
+`--wasm` takes a compiled file or its SHA-256. `--input` is hex bytes. `--dry-run` simulates `request` or `stake` without sending.
+
+`worker/start-nodes.sh` starts one listener for each `~/.config/solana/solcloud-node*.json`, or for the keypairs named, and restarts any that exits.
+
 ## Settle a round by hand
 
 The listeners settle rounds on their own. These scripts are the fallback. They run from `program/` with the devnet keypairs on the operator machine. Pass the task id:

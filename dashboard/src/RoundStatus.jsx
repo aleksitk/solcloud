@@ -41,21 +41,21 @@ export default function RoundStatus({ taskId, label = "Latest round", compact = 
   }, [taskId]);
 
   if (!round) {
-    return <p className={compact ? "hint" : "live-note"}>{note}</p>;
+    return <p className={compact ? "hint" : "empty"}>{note}</p>;
   }
 
   return (
-    <section className={compact ? "live-round compact" : "live-round"} aria-live="polite">
+    <section className={compact ? "round-card compact" : "round-card"} aria-live="polite">
       <div>
         <p className="kicker">{label}</p>
         <h2>
-          <i className={`live-dot ${round.tone}`} />
+          <i className={`dot ${round.tone}`} />
           {round.status}
         </h2>
         <p>{describeRound(round)}</p>
       </div>
       <a href={explorerAddress(round.address)} target="_blank" rel="noreferrer">
-        Round {round.id}
+        Round {round.id} ↗
       </a>
     </section>
   );

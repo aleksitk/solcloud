@@ -5,7 +5,9 @@ function explorerAddress(address) {
   return `https://explorer.solana.com/address/${address}?cluster=devnet`;
 }
 
-export default function RoundHistory() {
+const COLS = "56px minmax(150px, 1.4fr) minmax(90px, 1fr) minmax(90px, 1fr) 70px";
+
+export default function RoundHistory({ limit }) {
   const [rounds, setRounds] = useState(null);
   const [note, setNote] = useState("Reading settled rounds…");
 
@@ -36,49 +38,42 @@ export default function RoundHistory() {
     };
   }, []);
 
+  const shown = rounds && limit ? rounds.slice(0, limit) : rounds;
+
   return (
     <>
-      <div className="ledger-head">
-        <h2>History</h2>
-        <span>{rounds ? `${rounds.length} settled` : "Settled"}</span>
+      <div className="card-head">
+        <h2>Settled rounds</h2>
+        <span>{rounds ? `${rounds.length} settled` : ""}</span>
       </div>
-      {!rounds ? (
-        <p className="live-note">{note}</p>
+      {!rounds || rounds.length === 0 ? (
+        <p className="empty">{note}</p>
       ) : (
-        <div className="sheet">
-          <div className="sheet-head">
-            <span>Round</span>
-            <span>Status</span>
-            <span>Agreement</span>
-            <span>Effect</span>
-            <span />
-          </div>
-          {rounds.map((round) => (
-            <a
-              key={round.id}
-              className="sheet-row"
-              href={explorerAddress(round.address)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <span className="mono">{round.id}</span>
-              <span className="status">
-                <b>
-                  <i className={round.tone} />
+        <div className="table-wrap">
+          <div className="table" style={{ "--cols": COLS, "--min": "560px" }}>
+            <div className="table-head">
+              <span>Round</span>
+              <span>Status</span>
+              <span>Agreement</span>
+              <span>Reward</span>
+              <span />
+            </div>
+            {shown.map((round) => (
+              <a key={round.id} className="table-row" href={explorerAddress(round.address)} target="_blank" rel="noreferrer">
+                <span className="mono">{round.id}</span>
+                <span className="state">
+                  <i className={`dot ${round.tone}`} />
                   {round.status}
-                </b>
-                <em>{round.title}</em>
-              </span>
-              <span className="row-meta">
-                <span className="mono agree">
-                  <b>{round.agreement}</b>
-                  <em>need {round.threshold}</em>
+                  <small>{round.title}</small>
+                </span>
+                <span className="mono">
+                  {round.agreement} <span className="muted">· need {round.threshold}</span>
                 </span>
                 <span className={`mono amount ${round.tone}`}>{round.effect}</span>
-                <span className="go">Explorer</span>
-              </span>
-            </a>
-          ))}
+                <span className="go">Explorer ↗</span>
+              </a>
+            ))}
+          </div>
         </div>
       )}
     </>

@@ -802,6 +802,7 @@ export async function buildRequestTask({
   rewardLamports,
   seed,
   mazeSize,
+  input: rawInput,
   wasmHash = WASM_HASH,
   committeeSize,
   owners,
@@ -810,7 +811,8 @@ export async function buildRequestTask({
   if (!Number.isInteger(committeeSize) || !Array.isArray(owners) || owners.length !== committeeSize) {
     throw new Error("The committee does not match the chosen size.");
   }
-  const input = mazeInput(seed, mazeSize);
+  // A custom function takes the bytes as given. The maze builds its own from seed and size.
+  const input = rawInput ? Buffer.from(rawInput) : mazeInput(seed, mazeSize);
   const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
   const [task] = PublicKey.findProgramAddressSync(
     [Buffer.from("task"), u64(taskId)],

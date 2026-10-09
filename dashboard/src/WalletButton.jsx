@@ -5,80 +5,118 @@ function short(value) {
   return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }
 
-export default function WalletButton() {
+export default function WalletButton({ label = "Connect", center = false }) {
   const { address, balance, note, setNote, connect, disconnect } = useWallet();
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const rootRef = useRef(null);
 
   useEffect(() => {
     function onPointer(event) {
       if (rootRef.current && !rootRef.current.contains(event.target)) setOpen(false);
     }
+    function onKey(event) {
+      if (event.key === "Escape") setOpen(false);
+    }
     document.addEventListener("pointerdown", onPointer);
-    return () => document.removeEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   async function onConnect(wallet) {
     setNote("");
+    // A wallet whose extension has stopped never answers and opens no window.
+    // Say so instead of leaving the menu silent.
+    const silent = setTimeout(() => {
+      setNote(
+        `${wallet.name} has not answered. If no window opened, turn the extension off and on in chrome://extensions, then reload this tab.`
+      );
+    }, 8000);
     try {
       await connect(wallet);
       setOpen(false);
     } catch (err) {
       console.error("wallet connect", err);
       setNote(walletErrorText(err));
+    } finally {
+      clearTimeout(silent);
     }
   }
 
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  const menuClass = center ? "wallet-menu center" : "wallet-menu";
+
   if (address) {
-    const balanceText = balance == null ? "devnet" : `${balance.toFixed(3)} SOL`;
     return (
-      <div className="flex items-center gap-3 font-mono text-xs">
-        <span className="font-mono text-xs text-[#5c6570]">{balanceText}</span>
-        <button type="button" className="font-mono text-xs text-[#1c2128] hover:text-[#0b7a4b]" onClick={disconnect}>
+      <div className="wallet" ref={rootRef}>
+        <button type="button" className="wallet-chip" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+          <i className="dot good" />
           {short(address)}
+          <em>{balance == null ? "devnet" : `${balance.toFixed(2)} SOL`}</em>
         </button>
+        {open && (
+          <div className={menuClass}>
+            <button type="button" onClick={copy}>
+              {copied ? "Copied" : "Copy address"}
+            </button>
+            <a href={`https://explorer.solana.com/address/${address}?cluster=devnet`} target="_blank" rel="noreferrer">
+              View on Explorer <small>↗</small>
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                disconnect();
+              }}
+            >
+              Disconnect
+            </button>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="relative" ref={rootRef}>
+    <div className="wallet" ref={rootRef}>
       <button
         type="button"
-        className="rounded-full bg-[#1c2128] px-4 py-2 font-sans text-sm font-medium text-white hover:bg-[#2c333b]"
+        className={center ? "btn" : "btn small"}
+        aria-expanded={open}
         onClick={() => {
           setNote("");
           setOpen((value) => !value);
         }}
       >
-        CONNECT
+        {label}
       </button>
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-56 rounded-2xl border border-black/10 bg-white p-1 text-[#1c2128] shadow-[0_18px_40px_rgba(23,21,28,0.12)]">
-          <p className="px-3 py-2 font-mono text-[11px] text-[#5c6570]">Set the wallet to Devnet.</p>
+        <div className={menuClass}>
+          <p>Set the wallet to Devnet.</p>
           {walletChoices().map((wallet) =>
             wallet.provider ? (
-              <button
-                key={wallet.id}
-                type="button"
-                className="block w-full rounded-xl px-3 py-2 text-left font-mono text-xs text-[#1c2128] hover:bg-[#e7eaee]"
-                onClick={() => onConnect(wallet)}
-              >
-                {wallet.name}
+              <button key={wallet.id} type="button" onClick={() => onConnect(wallet)}>
+                {wallet.name} <small>Detected</small>
               </button>
             ) : (
-              <a
-                key={wallet.id}
-                className="block px-3 py-2 font-mono text-xs text-[#5c6570] hover:text-[#1c2128]"
-                href={wallet.install}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {wallet.name} · install
+              <a key={wallet.id} href={wallet.install} target="_blank" rel="noreferrer">
+                {wallet.name} <small>Install ↗</small>
               </a>
             )
           )}
-          {note && <p className="px-3 py-2 font-mono text-[11px] text-[#5c6570]">{note}</p>}
+          {note && <p className="warn">{note}</p>}
         </div>
       )}
     </div>

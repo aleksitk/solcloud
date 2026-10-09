@@ -36,43 +36,28 @@ export default function NodeList() {
     };
   }, []);
 
-  if (!nodes) {
-    return <p className="live-note ledger-follow">{note}</p>;
-  }
-
   return (
-    <div className="ledger-follow">
-      <div className="ledger-head">
+    <>
+      <div className="card-head">
         <h2>Nodes</h2>
-        <span>{nodes.length} staked</span>
+        <span>{nodes ? `${nodes.length} staked` : ""}</span>
       </div>
-      <div className="sheet">
-        <div className="sheet-head nodes-head">
-          <span>Node</span>
-          <span>Status</span>
-          <span>Stake</span>
-          <span />
-        </div>
-        {nodes.map((node) => (
-          <a
-            key={node.address}
-            className="sheet-row nodes-row"
-            href={explorerAddress(node.address)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <span className="mono">{node.id}</span>
-            <span className="status">
-              <b>
-                <i className={node.tone} />
+      {!nodes || nodes.length === 0 ? (
+        <p className="empty">{note}</p>
+      ) : (
+        <div className="table" style={{ "--cols": "minmax(0, 1fr) 84px 92px" }}>
+          {nodes.map((node) => (
+            <a key={node.address} className="table-row" href={explorerAddress(node.address)} target="_blank" rel="noreferrer">
+              <span className="mono">{node.id}</span>
+              <span className="state">
+                <i className={`dot ${node.tone}`} />
                 {node.status}
-              </b>
-            </span>
-            <span className={`mono amount ${node.reduced ? "bad" : "good"}`}>{node.stakeText} SOL</span>
-            <span className="go">Explorer</span>
-          </a>
-        ))}
-      </div>
-    </div>
+              </span>
+              <span className="mono">{node.stakeText} SOL</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </>
   );
 }

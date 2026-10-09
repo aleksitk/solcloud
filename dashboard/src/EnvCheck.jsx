@@ -58,25 +58,25 @@ export default function EnvCheck() {
   const tone = running ? "" : result === "pass" ? "good" : result === "fail" ? "bad" : "";
 
   return (
-    <div className="env-check">
-      <div className="ledger-head">
-        <h2>Environment</h2>
-        <span className="status">
-          <b>
-            <i className={tone} />
-            {label}
-          </b>
+    <div className="card">
+      <div className="card-head">
+        <h3>Machine check</h3>
+        <span className="state">
+          <i className={`dot ${tone}`} />
+          {label}
         </span>
       </div>
-      <p className="hint">
-        Run <span className="mono">node check.mjs</span> in the worker folder on this machine before it takes work. The node list does not use the result.
+      <p className="hint" style={{ marginTop: 0 }}>
+        Runs the worker self-test on this machine: the maze result, a wrong-hash refusal, and the timeout. It works
+        when the site is served from the repository with <span className="mono">npm run dev</span>.
       </p>
-      <button className="submit" type="button" onClick={run} disabled={running}>
-        {running ? "Checking…" : result ? "Check again" : "Check this machine"}
-      </button>
-      {running ? <p className="checked">Running the check on this machine…</p> : null}
+      <div className="row-actions" style={{ marginTop: 16 }}>
+        <button className="btn ghost small" type="button" onClick={run} disabled={running}>
+          {running ? "Checking…" : result ? "Check again" : "Check this machine"}
+        </button>
+      </div>
       {!running && checkedAt ? (
-        <p className="checked">{result === "fail" ? "Failed" : "Passed"} at {clock(checkedAt)}.</p>
+        <p className="hint">{result === "fail" ? "Failed" : "Passed"} at {clock(checkedAt)}.</p>
       ) : null}
       {detail ? <p className="form-error">{detail}</p> : null}
     </div>

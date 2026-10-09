@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { WASM_HASH } from "./requestTask.js";
-import { STARTER } from "./starter.js";
 import { useFunctionChoice } from "./functionChoice.jsx";
 
 function bytesFromBase64(value) {
@@ -10,22 +8,11 @@ function bytesFromBase64(value) {
   return bytes;
 }
 
-export default function FunctionView({ onUse }) {
-  const { compiled, chooseLabyrinth, chooseCompiled } = useFunctionChoice();
-  const [copied, setCopied] = useState(false);
-  const [source, setSource] = useState(STARTER);
+// The editor a requester writes their program in.
+export default function CodeEditor() {
+  const { source, setSource, compiled, setCompiled } = useFunctionChoice();
   const [compiling, setCompiling] = useState(false);
   const [error, setError] = useState("");
-
-  async function copyHash() {
-    try {
-      await navigator.clipboard.writeText(WASM_HASH);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1400);
-    } catch {
-      setCopied(false);
-    }
-  }
 
   async function compile() {
     if (compiling) return;
@@ -43,11 +30,7 @@ export default function FunctionView({ onUse }) {
       }
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Compile failed.");
-      chooseCompiled({
-        name: "Your function",
-        hash: body.hash,
-        bytes: bytesFromBase64(body.wasmBase64),
-      });
+      setCompiled({ name: "Your code", hash: body.hash, bytes: bytesFromBase64(body.wasmBase64) });
     } catch (err) {
       setError(err.message || "Compile failed.");
     } finally {
@@ -56,75 +39,41 @@ export default function FunctionView({ onUse }) {
   }
 
   return (
-    <section className="shell launch fn-page">
-      <p className="kicker">Functions</p>
-      <h1>Write the program.</h1>
-      <p className="lede">Integers only. Export alloc and run. The hash is what the next task stores.</p>
-
-      <div className="fn-workspace">
-        <section className="fn-editor" aria-label="AssemblyScript editor">
-          <header className="fn-editor-bar">
-            <span className="fn-file">function.ts</span>
-            <span className={compiled ? "fn-state on" : "fn-state"}>{compiled ? "Compiled" : "Draft"}</span>
-            <button type="button" className="submit fn-use" onClick={compile} disabled={compiling}>
-              {compiling ? "Compiling…" : "Compile"}
-            </button>
-          </header>
-          <textarea
-            className="fn-source"
-            value={source}
-            spellCheck={false}
-            onChange={(event) => setSource(event.target.value)}
-            aria-label="AssemblyScript source"
-          />
-          {error ? <pre className="fn-error">{error}</pre> : null}
-          {compiled ? (
-            <footer className="fn-editor-foot">
-              <div>
-                <span>Wasm hash</span>
-                <code>{compiled.hash}</code>
-                <span className="fn-saved">Saved for the nodes on this machine.</span>
-              </div>
-              <button type="button" className="path-open" onClick={onUse}>
-                Use for a new task
-              </button>
-            </footer>
-          ) : null}
-        </section>
-
-        <aside className="fn-card fn-side">
-          <header className="fn-head">
-            <h2>Labyrinth</h2>
-            <span>Built in</span>
-          </header>
-          <p>Already registered. Seed and size in, path length and hash out.</p>
-          <label className="hash-field">
-            Wasm hash
-            <textarea
-              readOnly
-              rows={3}
-              value={WASM_HASH}
-              spellCheck={false}
-              onFocus={(event) => event.target.select()}
-            />
-          </label>
-          <div className="fn-actions">
-            <button type="button" className="path-open" onClick={copyHash}>
-              {copied ? "Copied" : "Copy hash"}
-            </button>
-            <button
-              type="button"
-              className="submit fn-use"
-              onClick={() => {
-                chooseLabyrinth();
-                onUse();
-              }}
-            >
-              Use for a new task
-            </button>
-          </div>
-        </aside>
-      </div>
-    </section>
+    <>
+      <section className="fn-editor" aria-label="AssemblyScript editor">
+        <header className="fn-editor-bar">
+          <span className="fn-file">function.ts</span>
+          <span className={compiled ? "fn-state on" : "fn-state"}>{compiled ? "Compiled" : "Not compiled"}</span>
+          <button type="button" className="btn small" onClick={compile} disabled={compiling}>
+            {compiling ? "Compiling…" : "Compile"}
+          </button>
+        </header>
+        <textarea
+          className="fn-source"
+          value={source}
+          spellCheck={false}
+          onChange={(event) => setSource(event.target.value)}
+          aria-label="AssemblyScript source"
+        />
+        {error ? <pre className="fn-error">{error}</pre> : null}
+        {compiled ? (
+          <footer className="fn-editor-foot">
+            <div>
+              <span>Wasm SHA-256</span>
+              <code>{compiled.hash}</code>
+            </div>
+          </footer>
+        ) : null}
+      </section>
+      <p className="note">
+        <b>This code is the program the nodes run.</b> Compile turns it into Wasm. The task stores that Wasm's
+        SHA-256, and every node on the committee runs those exact bytes and refuses anything else. Use integers
+        only, export <span className="mono">alloc</span> and <span className="mono">run</span>, and keep input and
+        output within 64 bytes.
+      </p>
+      <p className="note warn">
+        For now a compiled function is saved on this machine only, so only nodes running here can execute it.
+      </p>
+    </>
   );
 }

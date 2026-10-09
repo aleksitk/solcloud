@@ -45,51 +45,37 @@ export default function MyRequests({ owner, refreshKey }) {
   const settledEmpty = rows?.some((row) => row.reward === 0n);
 
   return (
-    <div className="my-requests">
-      <div className="ledger-head">
+    <div className="card flush">
+      <div className="card-head">
         <h2>My requests</h2>
-        <span>{rows ? `${rows.length} recorded` : "Recorded"}</span>
+        <span>{rows ? `${rows.length} recorded` : ""}</span>
       </div>
-      {!owner ? (
-        <p className="hint">Connect a wallet to see the tasks it created.</p>
-      ) : !rows ? (
-        <p className="hint">{note}</p>
-      ) : rows.length === 0 ? (
-        <p className="hint">{note}</p>
+      {!rows || rows.length === 0 ? (
+        <p className="empty">{note}</p>
       ) : (
         <>
-          <div className="sheet">
-            <div className="sheet-head">
-              <span>Round</span>
-              <span>Status</span>
-              <span>Reward</span>
-              <span />
-            </div>
-            {rows.map((row) => (
-              <a
-                key={row.address}
-                className="sheet-row"
-                href={explorerAddress(row.result || row.address)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <span className="mono">{row.id}</span>
-                <span className="status">
-                  <b>
-                    <i className={row.tone} />
+          <div className="table-wrap">
+            <div className="table" style={{ "--cols": "56px minmax(140px, 1.4fr) 1fr 70px", "--min": "440px" }}>
+              <div className="table-head">
+                <span>Round</span>
+                <span>Status</span>
+                <span>Escrow left</span>
+                <span />
+              </div>
+              {rows.map((row) => (
+                <a key={row.address} className="table-row" href={explorerAddress(row.result || row.address)} target="_blank" rel="noreferrer">
+                  <span className="mono">{row.id}</span>
+                  <span className="state">
+                    <i className={`dot ${row.tone}`} />
                     {row.status}
-                  </b>
-                </span>
-                <span className="row-meta">
+                  </span>
                   <span className="mono">{solLabel(row.reward)} SOL</span>
-                  <span className="go">{row.result ? "Result" : "Task"}</span>
-                </span>
-              </a>
-            ))}
+                  <span className="go">{row.result ? "Result ↗" : "Task ↗"}</span>
+                </a>
+              ))}
+            </div>
           </div>
-          {settledEmpty ? (
-            <p className="hint">A settled round stores 0. The reward was paid or returned.</p>
-          ) : null}
+          {settledEmpty ? <p className="empty">A settled round holds 0. Its reward was paid or returned.</p> : null}
         </>
       )}
     </div>

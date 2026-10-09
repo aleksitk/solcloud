@@ -180,7 +180,7 @@ export function MazeSummary({ onOpen }) {
           <p>{bytes === null ? "Waiting for the result." : `${bytes} bytes`}</p>
         </div>
         {round.output ? (
-          <button type="button" className="path-open" onClick={onOpen}>
+          <button type="button" className="btn ghost small" onClick={onOpen}>
             Show output
           </button>
         ) : null}
@@ -206,7 +206,7 @@ export function MazeSummary({ onOpen }) {
         )}
       </div>
       {trace ? (
-        <button type="button" className="path-open" onClick={onOpen}>
+        <button type="button" className="btn ghost small" onClick={onOpen}>
           Open map
         </button>
       ) : null}
@@ -247,7 +247,7 @@ export function MazeView({ onClose }) {
     return (
       <section className="shell map-view">
         <button type="button" className="map-back" onClick={onClose}>
-          ← Rounds
+          ← Network
         </button>
         <h1 ref={titleRef} tabIndex={-1}>
           Output
@@ -268,7 +268,7 @@ export function MazeView({ onClose }) {
   return (
     <section className="shell map-view">
       <button type="button" className="map-back" onClick={onClose}>
-        ← Rounds
+        ← Network
       </button>
       <h1 ref={titleRef} tabIndex={-1}>
         Solved path

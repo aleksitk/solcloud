@@ -1,24 +1,21 @@
 import { createContext, useContext, useState } from "react";
-import { WASM_HASH } from "./requestTask.js";
+import { STARTER } from "./starter.js";
 
-const LABYRINTH = { name: "Labyrinth", hash: WASM_HASH, bytes: null };
 const FunctionChoiceContext = createContext(null);
 
+// The editor's source and its last compile live here, so they survive a tab change.
 export function FunctionProvider({ children }) {
-  const [choice, setChoice] = useState(LABYRINTH);
+  const [source, setSourceText] = useState(STARTER);
   const [compiled, setCompiled] = useState(null);
 
-  function chooseLabyrinth() {
-    setChoice(LABYRINTH);
-  }
-
-  function chooseCompiled(next) {
-    setCompiled(next);
-    setChoice(next);
+  // An edit after a compile makes the stored hash stale.
+  function setSource(next) {
+    setSourceText(next);
+    setCompiled(null);
   }
 
   return (
-    <FunctionChoiceContext.Provider value={{ choice, compiled, chooseLabyrinth, chooseCompiled }}>
+    <FunctionChoiceContext.Provider value={{ source, setSource, compiled, setCompiled }}>
       {children}
     </FunctionChoiceContext.Provider>
   );
