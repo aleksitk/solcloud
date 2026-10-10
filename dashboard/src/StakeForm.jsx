@@ -11,6 +11,7 @@ import {
   solToLamports,
 } from "./requestTask.js";
 import EnvCheck from "./EnvCheck.jsx";
+import LeaveNode from "./LeaveNode.jsx";
 import NodeHistory from "./NodeHistory.jsx";
 import { ListenerSetup } from "./Setup.jsx";
 import { useWallet } from "./wallet.jsx";
@@ -198,6 +199,7 @@ export default function StakeForm() {
             ["rounds", "Rounds"],
             ["listener", "Listener"],
             ["check", "Machine check"],
+            ["leave", "Leave"],
           ].map(([id, label]) => (
             <button
               key={id}
@@ -218,8 +220,10 @@ export default function StakeForm() {
             <div className="card">
               <ListenerSetup />
             </div>
-          ) : (
+          ) : tab === "check" ? (
             <EnvCheck />
+          ) : (
+            <LeaveNode onChange={() => setResult({ changed: Date.now() })} />
           )}
         </div>
       </>

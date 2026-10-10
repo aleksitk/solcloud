@@ -2,6 +2,8 @@
 //   node cli.mjs request <keypair.json> --wasm <file.wasm|hash> --input <hex> [--reward 0.05] [--committee 3]
 //   node cli.mjs publish <keypair.json> <file.wasm>
 //   node cli.mjs stake   <keypair.json> [--sol 1]
+//   node cli.mjs exit    <keypair.json>            leave the registry, start the exit delay
+//   node cli.mjs withdraw <keypair.json>           after the delay, take the stake back
 //   node cli.mjs status  <task-id>
 //   node cli.mjs nodes
 // request publishes a .wasm file on chain first, so every node can fetch it.
@@ -24,7 +26,7 @@ function fail(message) {
 }
 
 function usage() {
-  fail(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 8).join("\n").replaceAll("// ", ""));
+  fail(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 10).join("\n").replaceAll("// ", ""));
 }
 
 function flags(args) {
@@ -204,6 +206,44 @@ async function stake(args) {
   console.log(`now start the listener: node listener.mjs ${args[0]}`);
 }
 
+async function exit(args) {
+  const owner = loadKeypair(args[0]);
+  const program = connect(owner);
+  const ticket = pda(program, Buffer.from("exit"), owner.publicKey.toBuffer());
+  const call = program.methods.requestExit().accounts({
+    config: pda(program, Buffer.from("config")),
+    node: pda(program, Buffer.from("node"), owner.publicKey.toBuffer()),
+    ticket,
+    owner: owner.publicKey,
+    systemProgram: SystemProgram.programId,
+  });
+  console.log(`signature ${await call.rpc()}`);
+  const ready = (await program.account.exitTicket.fetch(ticket)).readyAt.toNumber();
+  console.log(`out of the registry. Withdraw after ${new Date(ready * 1000).toISOString()}`);
+  console.log("keep the listener running until then: rounds that already drew this node still count.");
+}
+
+async function withdraw(args) {
+  const owner = loadKeypair(args[0]);
+  const program = connect(owner);
+  const ticket = pda(program, Buffer.from("exit"), owner.publicKey.toBuffer());
+  const stored = await program.account.exitTicket.fetchNullable(ticket);
+  if (!stored) fail("This node has not asked to leave. Run: node cli.mjs exit <keypair.json>");
+  const wait = stored.readyAt.toNumber() - Math.floor(Date.now() / 1000);
+  if (wait > 0) fail(`The exit delay has ${wait} seconds left.`);
+  const signature = await program.methods
+    .withdrawStake()
+    .accounts({
+      config: pda(program, Buffer.from("config")),
+      node: pda(program, Buffer.from("node"), owner.publicKey.toBuffer()),
+      ticket,
+      owner: owner.publicKey,
+    })
+    .rpc();
+  console.log(`signature ${signature}`);
+  console.log("the node account is closed and the stake is back in the wallet.");
+}
+
 async function status(args) {
   if (!/^\d+$/.test(args[0] || "")) fail("usage: node cli.mjs status <task-id>");
   const program = connect();
@@ -229,6 +269,6 @@ async function nodes() {
 }
 
 const [command, ...rest] = process.argv.slice(2);
-const run = { request, publish, stake, status, nodes }[command];
+const run = { request, publish, stake, exit, withdraw, status, nodes }[command];
 if (!run) usage();
 run(rest).catch((err) => fail(err?.message?.split("\n")[0] || String(err)));

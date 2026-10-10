@@ -19,10 +19,13 @@ pub const MAX_MODULE_LEN: usize = 10_000;
 pub const MAX_OUTPUT_LEN: usize = 64;
 
 /// How long (seconds) nodes have to submit commits after a task is created.
-/// Demo value: long enough to run the steps by hand. Production would be shorter.
-pub const COMMIT_WINDOW_SECS: i64 = 86_400;
-/// How long (seconds) nodes have to reveal after every commit is in.
-pub const REVEAL_WINDOW_SECS: i64 = 86_400;
+/// A listener commits within seconds. Five minutes covers a slow RPC.
+pub const COMMIT_WINDOW_SECS: i64 = 300;
+/// How long (seconds) after the commit deadline nodes have to reveal.
+pub const REVEAL_WINDOW_SECS: i64 = 300;
+/// How long (seconds) a node waits between asking to leave and taking its stake.
+/// Longer than both windows, so every round that drew it has settled and could still slash it.
+pub const EXIT_DELAY_SECS: i64 = COMMIT_WINDOW_SECS + REVEAL_WINDOW_SECS + 60;
 
 /// PDA seed prefixes.
 pub const CONFIG_SEED: &[u8] = b"config";
@@ -31,6 +34,7 @@ pub const TASK_SEED: &[u8] = b"task";
 pub const COMMIT_SEED: &[u8] = b"commit";
 pub const RESULT_SEED: &[u8] = b"result";
 pub const MODULE_SEED: &[u8] = b"module";
+pub const EXIT_SEED: &[u8] = b"exit";
 
 /// Majority threshold for an N-node committee: `floor(N / 2) + 1`.
 /// e.g. N=3 -> 2, N=5 -> 3, N=11 -> 6.

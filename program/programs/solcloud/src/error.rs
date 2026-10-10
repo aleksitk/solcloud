@@ -58,4 +58,6 @@ pub enum SolCloudError {
     ModuleOverflow,
     #[msg("The uploaded bytes do not hash to the module's SHA-256.")]
     ModuleHashMismatch,
+    #[msg("The exit delay has not passed yet.")]
+    ExitNotReady,
 }

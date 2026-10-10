@@ -36,7 +36,7 @@ Wallet ── request_task ──► SolCloud program (devnet)
 2. **Request.** The wallet signs `request_task` with a slot it just read. The program draws the committee from `config.active_nodes` with `sha256(slot ‖ task_id)` and rejects any other list. The reward moves into the task account.
 3. **Run.** A node checks the Wasm SHA-256, then runs `alloc` and `run` on a worker thread with a timeout. The host import is only `env.abort`.
 4. **Commit, then reveal.** The output stays hidden until every committee node has committed. The reveal must match the commit.
-5. **Settle.** `finalize` pays the majority and slashes a mismatch (the live config takes 50% of that node's recorded stake). A timeout with a missing commit or reveal refunds the requester and does not slash.
+5. **Settle.** `finalize` pays the majority and slashes a mismatch (the live config takes 50% of that node's recorded stake). Each window is five minutes. A node that never commits costs the round a refund and nobody is slashed. A node that commits and never reveals is slashed like a mismatch, and the round settles on the reveals that arrived.
 
 `register_node` adds the owner to `config.active_nodes`, so a new node can be drawn on the next request.
 
@@ -139,5 +139,6 @@ node scripts/finalize.cjs <task-id>
 - The function must be deterministic. Floats, time, and randomness are out.
 - Input and output are capped at 64 bytes.
 - The committee draw uses a recent slot and the task id. It is not a VRF: a requester can try other task ids until the draw suits them.
-- A registered node is drawn whether or not its listener is running. An offline node stalls the round until the window closes, then the reward is refunded.
+- A registered node is drawn whether or not its listener is running. An offline node holds the round for five minutes, then the reward is refunded. It is not dropped from the registry.
+- A node leaves with `request_exit`, waits 11 minutes while its stake stays slashable, then takes it back with `withdraw_stake`.
 - Security is an honest majority plus stake, not a cryptographic proof.

@@ -109,9 +109,16 @@ node cli.mjs status 14`}</pre>
             <p>From then on it finds its tasks, runs them, commits, reveals, and settles the round. Nothing else to do.</p>
             <h3>3. Keep it running</h3>
             <p>
-              A node that is picked while its listener is off stalls the round. To restart it automatically, use{" "}
+              A node that is picked while its listener is off holds the round up until the window closes. To restart
+              it automatically, use{" "}
               <code>./start-nodes.sh</code>, or install <code>solcloud-listener.service</code> with systemd on a
               server.
+            </p>
+            <h3>4. Leave</h3>
+            <p>
+              On the Run a node page, open Leave. The node drops out of the registry at once. After about 11
+              minutes, once every round that picked it has settled, you can withdraw what is left of the stake.
+              From a terminal: <code>node cli.mjs exit</code>, then <code>node cli.mjs withdraw</code>.
             </p>
           </section>
 
@@ -162,8 +169,13 @@ node cli.mjs status 14`}</pre>
               </li>
             </ol>
             <p>
-              If a node never commits or never reveals, the window closes and the reward goes back to the requester.
-              Nobody is slashed for a round that times out.
+              Each step has five minutes. If a node never commits, the reward goes back to the requester and nobody
+              is slashed: no answer was hidden.
+            </p>
+            <p>
+              If a node commits and then never reveals, it is slashed like a wrong answer. Otherwise a node could
+              hide a mistake by staying silent. The round still settles on the answers that did arrive, as long as
+              they are a majority of the whole committee.
             </p>
           </section>
 

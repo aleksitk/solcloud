@@ -1,6 +1,6 @@
 // One node, one process. Polls devnet, commits and reveals its own tasks,
-// then settles any round that is ready: finalize after the last reveal,
-// refund once a window has closed.
+// then settles any round that is ready: finalize after the last reveal or
+// once the reveal window has closed, refund when the commit window closed.
 // Start: node listener.mjs <keypair.json>
 
 import { createHash, randomBytes } from "node:crypto";
@@ -322,6 +322,11 @@ async function revealTask(task, taskId) {
     return;
   }
   if (nowSecs() > task.account.revealDeadline.toNumber()) return;
+  // Test switch: commit and then stay silent, to exercise the slash for a missing reveal.
+  if (process.env.SOLCLOUD_SKIP_REVEAL === "1") {
+    logOnce(taskId, "reveal", "skipped: SOLCLOUD_SKIP_REVEAL is set");
+    return;
+  }
 
   const saved = readState(taskId);
   if (!Buffer.from(onChain.hashCommitment).equals(commitment(saved.output, saved.nonce))) {
@@ -357,13 +362,9 @@ function settleStep(task) {
   const now = nowSecs() - CLOCK_MARGIN_SECS;
   if (status === "revealing" && account.revealCount === account.committeeSize) return "finalize";
   if (status === "committing" && now > account.commitDeadline.toNumber()) return "refund";
-  if (
-    status === "revealing" &&
-    now > account.revealDeadline.toNumber() &&
-    account.revealCount < account.committeeSize
-  ) {
-    return "refund";
-  }
+  // A closed reveal window is settled by finalize too. It counts the reveals
+  // that arrived and slashes the nodes that committed and stayed silent.
+  if (status === "revealing" && now > account.revealDeadline.toNumber()) return "finalize";
   return null;
 }
 

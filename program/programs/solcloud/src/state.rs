@@ -124,6 +124,17 @@ impl ModuleAccount {
     pub const BASE_SPACE: usize = 32 + 32 + 4 + 1 + 1 + 4;
 }
 
+/// A node's request to leave (PDA, seed = "exit" ++ owner).
+/// Kept apart from NodeAccount so older node accounts need no new field.
+#[account]
+#[derive(InitSpace)]
+pub struct ExitTicket {
+    pub owner: Pubkey,
+    /// Unix time from which the stake can be withdrawn.
+    pub ready_at: i64,
+    pub bump: u8,
+}
+
 /// The finalized, verified result of a task (PDA, seed = "result" ++ task).
 #[account]
 #[derive(InitSpace)]

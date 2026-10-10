@@ -235,7 +235,8 @@ pub mod solcloud {
         let owner = ctx.accounts.owner.key();
         let node = load_node(&ctx.accounts.node.to_account_info(), ctx.program_id)?;
         require!(node.owner == owner, SolCloudError::InvalidCommitteeNode);
-        require!(node.status == NodeStatus::Active, SolCloudError::NodeNotActive);
+        // A node that asked to leave still answers the rounds that already drew it.
+        require!(node.status != NodeStatus::Slashed, SolCloudError::NodeNotActive);
         require!(
             ctx.accounts.task.committee.contains(&owner),
             SolCloudError::NotInCommittee
@@ -318,19 +319,25 @@ pub mod solcloud {
 
     /// Tally reveals. Majority (`floor(N/2)+1`) wins and is paid. Otherwise refund.
     ///
-    /// Remaining accounts are triples:
+    /// Runs once every node has revealed, or once the reveal window has closed.
+    /// After the window a node that committed and stayed silent is slashed, so
+    /// hiding a wrong answer costs the same as revealing it. The majority is
+    /// still counted against the full committee size.
+    ///
+    /// Remaining accounts are triples, one per committee node:
     /// `[commit_0, wallet_0, node_0, ...]`.
     /// `wallet` is the node owner and must match `commit.node`.
     /// `node` is that owner's node PDA. A minority reveal loses `slash_bps` of its stake.
     pub fn finalize(ctx: Context<Finalize>, _task_id: u64) -> Result<()> {
         let committee_size = ctx.accounts.task.committee_size;
         require!(
-            ctx.accounts.task.reveal_count == committee_size,
+            ctx.accounts.task.status == TaskStatus::Revealing,
             SolCloudError::InvalidTaskState
         );
         require!(
-            ctx.accounts.task.status == TaskStatus::Revealing,
-            SolCloudError::InvalidTaskState
+            ctx.accounts.task.reveal_count == committee_size
+                || Clock::get()?.unix_timestamp > ctx.accounts.task.reveal_deadline,
+            SolCloudError::WindowStillOpen
         );
         require!(
             ctx.remaining_accounts.len() == committee_size as usize * 3,
@@ -342,17 +349,23 @@ pub mod solcloud {
         let mut best_output: Vec<u8> = Vec::new();
         let mut best_count: u8 = 0;
         let mut counts: Vec<([u8; 32], u8)> = Vec::new();
+        let mut seen: Vec<Pubkey> = Vec::new();
 
         for pair in 0..committee_size as usize {
             let commit = read_commit(&ctx.remaining_accounts[pair * 3])?;
             let wallet = ctx.remaining_accounts[pair * 3 + 1].key();
             require!(commit.task == task_key, SolCloudError::BadFinalizeAccounts);
-            require!(commit.revealed, SolCloudError::InvalidTaskState);
             require!(commit.node == wallet, SolCloudError::BadFinalizeAccounts);
             require!(
                 ctx.accounts.task.committee.contains(&commit.node),
                 SolCloudError::NotInCommittee
             );
+            // One vote per node: the same commit passed twice would count twice.
+            require!(!seen.contains(&commit.node), SolCloudError::BadFinalizeAccounts);
+            seen.push(commit.node);
+            if !commit.revealed {
+                continue;
+            }
 
             if let Some((_, n)) = counts.iter_mut().find(|(h, _)| *h == commit.output_hash) {
                 *n = n.checked_add(1).ok_or(SolCloudError::Overflow)?;
@@ -404,14 +417,17 @@ pub mod solcloud {
             let mut paid = 0u64;
             for pair in 0..committee_size as usize {
                 let commit = read_commit(&ctx.remaining_accounts[pair * 3])?;
-                if commit.output_hash == best_hash {
+                if commit.revealed && commit.output_hash == best_hash {
                     let node_info = &ctx.remaining_accounts[pair * 3 + 2];
                     let (pda, _) = Pubkey::find_program_address(
                         &[NODE_SEED, commit.node.as_ref()],
                         ctx.program_id,
                     );
                     require!(pda == node_info.key(), SolCloudError::InvalidCommitteeNode);
-                    note_task_completed(node_info)?;
+                    // A node that has since left has no account to count on. It is still paid.
+                    if node_info.owner == ctx.program_id {
+                        note_task_completed(node_info)?;
+                    }
                     move_lamports(
                         &ctx.accounts.task.to_account_info(),
                         &ctx.remaining_accounts[pair * 3 + 1],
@@ -434,12 +450,15 @@ pub mod solcloud {
             )?;
         }
 
-        // A majority loser loses slash_bps of its stake. The SOL goes to the treasury.
-        if agreed {
+        // Two ways to lose slash_bps of the stake: reveal against a majority, or commit
+        // and never reveal. The SOL goes to the treasury.
+        {
             let slash_bps = ctx.accounts.config.slash_bps;
             for pair in 0..committee_size as usize {
                 let commit = read_commit(&ctx.remaining_accounts[pair * 3])?;
-                if commit.output_hash == best_hash {
+                let silent = !commit.revealed;
+                let outvoted = agreed && commit.revealed && commit.output_hash != best_hash;
+                if !silent && !outvoted {
                     continue;
                 }
                 let node_info = &ctx.remaining_accounts[pair * 3 + 2];
@@ -448,6 +467,10 @@ pub mod solcloud {
                     ctx.program_id,
                 );
                 require!(pda == node_info.key(), SolCloudError::InvalidCommitteeNode);
+                // Settled so late that the node already withdrew: nothing is left to slash.
+                if node_info.owner != ctx.program_id {
+                    continue;
+                }
                 let slashed = reduce_stake(node_info, slash_bps)?;
                 move_lamports(
                     node_info,
@@ -461,23 +484,21 @@ pub mod solcloud {
         Ok(())
     }
 
-    /// Return the escrowed reward when a window closed before the task could finish.
+    /// Return the escrowed reward when the commit window closed before every node committed.
     ///
-    /// Committing: allowed after `commit_deadline` if not every node committed.
-    /// Revealing: allowed after `reveal_deadline` if not every node revealed.
-    /// A full set of reveals must use `finalize` instead, even after the deadline.
+    /// Nobody is slashed here: no answer was hidden, a node was only absent.
+    /// Once a task is revealing it must go through `finalize`, which also
+    /// handles a closed reveal window and slashes the nodes that stayed silent.
     pub fn refund_expired(ctx: Context<RefundExpired>, _task_id: u64) -> Result<()> {
         let clock = Clock::get()?;
         let now = clock.unix_timestamp;
         let status = ctx.accounts.task.status;
         let commit_deadline = ctx.accounts.task.commit_deadline;
-        let reveal_deadline = ctx.accounts.task.reveal_deadline;
         let reveal_count = ctx.accounts.task.reveal_count;
         let committee_size = ctx.accounts.task.committee_size;
 
         let expired = match status {
             TaskStatus::Committing => now > commit_deadline,
-            TaskStatus::Revealing => now > reveal_deadline && reveal_count < committee_size,
             _ => false,
         };
         require!(expired, SolCloudError::WindowStillOpen);
@@ -503,6 +524,54 @@ pub mod solcloud {
             &ctx.accounts.requester.to_account_info(),
             reward,
         )?;
+        Ok(())
+    }
+
+    /// A node asks to leave. It drops out of the registry at once, so no new round
+    /// can draw it, and its stake stays slashable until the exit delay has passed.
+    pub fn request_exit(ctx: Context<RequestExit>) -> Result<()> {
+        let owner = ctx.accounts.owner.key();
+        let node_info = ctx.accounts.node.to_account_info();
+        let mut node = load_node(&node_info, ctx.program_id)?;
+        require!(node.owner == owner, SolCloudError::InvalidCommitteeNode);
+        if node.status == NodeStatus::Active {
+            node.status = NodeStatus::Inactive;
+        }
+        grow_node(&node_info)?;
+        {
+            let mut data = node_info.try_borrow_mut_data()?;
+            node.try_serialize(&mut &mut data[..])?;
+        }
+
+        ctx.accounts.config.active_nodes.retain(|key| *key != owner);
+
+        let ticket = &mut ctx.accounts.ticket;
+        ticket.owner = owner;
+        ticket.ready_at = Clock::get()?.unix_timestamp + EXIT_DELAY_SECS;
+        ticket.bump = ctx.bumps.ticket;
+        Ok(())
+    }
+
+    /// After the exit delay, close the node account and return what is left of the stake.
+    pub fn withdraw_stake(ctx: Context<WithdrawStake>) -> Result<()> {
+        require!(
+            Clock::get()?.unix_timestamp >= ctx.accounts.ticket.ready_at,
+            SolCloudError::ExitNotReady
+        );
+        let node_info = ctx.accounts.node.to_account_info();
+        let node = load_node(&node_info, ctx.program_id)?;
+        require!(
+            node.owner == ctx.accounts.owner.key(),
+            SolCloudError::InvalidCommitteeNode
+        );
+
+        let balance = node_info.lamports();
+        move_lamports(&node_info, &ctx.accounts.owner.to_account_info(), balance)?;
+        node_info.resize(0)?;
+        node_info.assign(&system_program::ID);
+
+        let config = &mut ctx.accounts.config;
+        config.node_count = config.node_count.saturating_sub(1);
         Ok(())
     }
 
@@ -862,6 +931,45 @@ pub struct RefundExpired<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RequestExit<'info> {
+    #[account(mut, seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    /// CHECK: the signer's node PDA. An older account is shorter, so it is read by hand.
+    #[account(mut, seeds = [NODE_SEED, owner.key().as_ref()], bump)]
+    pub node: UncheckedAccount<'info>,
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + ExitTicket::INIT_SPACE,
+        seeds = [EXIT_SEED, owner.key().as_ref()],
+        bump
+    )]
+    pub ticket: Account<'info, ExitTicket>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawStake<'info> {
+    #[account(mut, seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    /// CHECK: the signer's node PDA. An older account is shorter, so it is read by hand.
+    #[account(mut, seeds = [NODE_SEED, owner.key().as_ref()], bump)]
+    pub node: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        close = owner,
+        seeds = [EXIT_SEED, owner.key().as_ref()],
+        bump = ticket.bump,
+        has_one = owner
+    )]
+    pub ticket: Account<'info, ExitTicket>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
 }
 
 #[derive(Accounts)]

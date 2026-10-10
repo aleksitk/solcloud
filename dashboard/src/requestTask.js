@@ -150,7 +150,7 @@ export function describeRound(round) {
     return `${round.reveals} of ${size} revealed. ${need} of ${size} was enough.`;
   }
   if (round.status === "Refunded") {
-    return `The reward returned to the requester. ${need} of ${size} had to agree.`;
+    return `No majority in time. The reward went back to the requester. ${need} of ${size} had to agree.`;
   }
   if (round.status === "Failed") {
     return "The round failed before a result was stored.";
@@ -422,6 +422,8 @@ function nodeOutcome(task, commit, result) {
   }
   if (task.status === "Refunded" || result?.status === "Refunded") {
     if (task.reveals >= task.committee) return { outcome: "No majority", tone: "muted" };
+    // Every node committed, the reveal window closed, and this one never revealed.
+    if (task.commits >= task.committee && !commit.revealed) return { outcome: "Slashed", tone: "bad" };
     return { outcome: "Timed out", tone: "muted" };
   }
   return { outcome: "Open", tone: "live" };
@@ -873,6 +875,63 @@ export async function sendSigned(signed, blockhash, lastValidBlockHeight) {
     throw new Error(`${message} Signature: ${signature}`);
   }
   return signature;
+}
+
+// ---- Leaving: a node exits the registry, waits out the delay, then takes its stake ----
+
+function exitPda(owner) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("exit"), new PublicKey(owner).toBuffer()],
+    PROGRAM_ID
+  )[0];
+}
+
+// The exit this owner has open, or null. `readyAt` is unix seconds.
+export async function readExit(owner) {
+  const info = await readAccount(exitPda(owner));
+  if (!info) return null;
+  return { readyAt: Number(Buffer.from(info.data).readBigInt64LE(40)) };
+}
+
+async function ownerTx(owner, ix) {
+  const { blockhash, lastValidBlockHeight } = await withRetries(() => connection.getLatestBlockhash("confirmed"));
+  const tx = new Transaction({ feePayer: new PublicKey(owner), recentBlockhash: blockhash }).add(ix);
+  return { tx, blockhash, lastValidBlockHeight };
+}
+
+export async function buildRequestExit({ owner }) {
+  const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
+  return ownerTx(
+    owner,
+    new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: config, isSigner: false, isWritable: true },
+        { pubkey: nodePda(owner), isSigner: false, isWritable: true },
+        { pubkey: exitPda(owner), isSigner: false, isWritable: true },
+        { pubkey: new PublicKey(owner), isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: await discriminator("request_exit"),
+    })
+  );
+}
+
+export async function buildWithdrawStake({ owner }) {
+  const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], PROGRAM_ID);
+  return ownerTx(
+    owner,
+    new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: config, isSigner: false, isWritable: true },
+        { pubkey: nodePda(owner), isSigner: false, isWritable: true },
+        { pubkey: exitPda(owner), isSigner: false, isWritable: true },
+        { pubkey: new PublicKey(owner), isSigner: true, isWritable: true },
+      ],
+      data: await discriminator("withdraw_stake"),
+    })
+  );
 }
 
 // ---- Wasm modules stored on chain, so any node can fetch the code a task names ----
