@@ -53,3 +53,4 @@ desktop.ini
 !.vscode/extensions.json
 .idea/
 *.swp
+worker/dist/

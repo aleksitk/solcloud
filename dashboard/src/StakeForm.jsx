@@ -13,7 +13,7 @@ import {
 import EnvCheck from "./EnvCheck.jsx";
 import LeaveNode from "./LeaveNode.jsx";
 import NodeHistory from "./NodeHistory.jsx";
-import { ListenerSetup } from "./Setup.jsx";
+import { ListenerSetup, QuickStart } from "./Setup.jsx";
 import { useWallet } from "./wallet.jsx";
 
 function solLabel(lamports) {
@@ -233,7 +233,18 @@ export default function StakeForm() {
   return (
     <div className="work">
       <div>
+        <div className="card">
+          <div className="card-head">
+            <h3>The quick way</h3>
+            <span>about 2 minutes</span>
+          </div>
+          <QuickStart />
+        </div>
         <form className="card" onSubmit={onSubmit}>
+          <div className="card-head">
+            <h3>Or stake from this wallet</h3>
+            <span>for a key you manage yourself</span>
+          </div>
           <div className="field-title">
             <i>1</i>
             Stake

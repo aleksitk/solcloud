@@ -2517,3 +2517,9 @@ label.field input {
 .footer-row a {
   padding: 8px 0;
 }
+
+.work > .gate {
+  margin: 0;
+  max-width: none;
+  padding: 32px 24px;
+}

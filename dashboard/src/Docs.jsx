@@ -91,6 +91,19 @@ node cli.mjs status 14`}</pre>
 
           <section className="doc" id="node">
             <h2>Run a node</h2>
+            <h3>The quick way, on Windows</h3>
+            <p>
+              Download{" "}
+              <a
+                className="text-link"
+                href="https://github.com/aleksitk/solcloud/releases/latest/download/solcloud-node.exe"
+              >
+                solcloud-node.exe
+              </a>{" "}
+              and run it. It makes a key, shows an address, waits for 1.06 devnet SOL, stakes, and starts answering
+              tasks. Its key and logs live in the <code>.solcloud</code> folder in your home folder. The steps below
+              do the same by hand, on any system.
+            </p>
             <h3>1. Stake</h3>
             <p>
               On this site, open{" "}

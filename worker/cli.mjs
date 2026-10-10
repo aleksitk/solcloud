@@ -13,9 +13,12 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
+// Anchor ships CommonJS. Node 22 does not see BN as a named export, so take the default.
+import anchor from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { DEFAULT_RPC, idlCandidates } from "./lib.mjs";
+
+const { AnchorProvider, BN, Program, Wallet } = anchor;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const LAMPORTS = 1_000_000_000;

@@ -9,7 +9,8 @@ function fail(error) {
   parentPort.postMessage({ ok: false, error });
 }
 
-try {
+async function main() {
+  try {
   if (workerData.delayMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, workerData.delayMs));
   }
@@ -41,6 +42,9 @@ try {
       }
     }
   }
-} catch (err) {
-  fail(err.message || "Wasm run failed.");
+  } catch (err) {
+    fail(err.message || "Wasm run failed.");
+  }
 }
+
+main();

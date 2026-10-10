@@ -101,6 +101,14 @@ sudo cp solcloud-listener.service /etc/systemd/system/
 sudo systemctl enable --now solcloud-listener
 ```
 
+## The packaged node
+
+`npm run build:node` in `worker/` packs the listener into one executable for the machine it runs on (`worker/dist/solcloud-node.exe` on Windows, about 80 MB). It needs no Node.js or git on the operator's machine.
+
+On first run it makes a key in `~/.solcloud/`, prints the address, waits for 1.06 devnet SOL, stakes 1 SOL, and starts the listener. Later runs go straight to the listener. State, logs, and downloaded modules live in the same folder.
+
+The site links to `releases/latest/download/solcloud-node.exe`, so each build is published as a GitHub release.
+
 ## From a terminal
 
 `worker/cli.mjs` does what the site does, with a keypair file in place of a wallet:

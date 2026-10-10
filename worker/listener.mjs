@@ -15,7 +15,8 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
+// Anchor ships CommonJS. Node 22 does not see BN as a named export, so take the default.
+import anchor from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import {
   DEFAULT_POLL_MS,
@@ -32,7 +33,11 @@ import {
 } from "./lib.mjs";
 import { moduleFile, runWasm } from "./run.mjs";
 
+const { AnchorProvider, BN, Program, Wallet } = anchor;
+
 const here = dirname(fileURLToPath(import.meta.url));
+// Where state, logs and modules live. The packaged node keeps them in the user's home folder.
+const dataRoot = process.env.SOLCLOUD_DATA || here;
 
 // A deadline is compared with this machine's clock. The margin keeps a
 // slightly fast clock from sending a refund the chain would still reject.
@@ -68,8 +73,10 @@ if (!keypairPath) {
 const owner = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(keypairPath, "utf8"))));
 const ownerText = owner.publicKey.toBase58();
 const tag = ownerTag(ownerText);
+// The packaged node carries the IDL inside it. From source it is read from disk.
+const builtInIdl = globalThis.SOLCLOUD_IDL;
 const idlTried = idlCandidates(here, process.env.SOLCLOUD_IDL);
-const idlPath = idlTried.find((candidate) => existsSync(candidate));
+const idlPath = builtInIdl ? "built in" : idlTried.find((candidate) => existsSync(candidate));
 if (!idlPath) {
   console.error("IDL not found. Tried:");
   for (const candidate of idlTried) console.error(candidate);
@@ -79,7 +86,7 @@ if (!idlPath) {
 const rpc = process.env.SOLCLOUD_RPC || DEFAULT_RPC;
 const wasmBase = process.env.SOLCLOUD_WASM_BASE || DEFAULT_WASM_BASE;
 const interval = process.env.SOLCLOUD_POLL_MS === undefined ? DEFAULT_POLL_MS : pollMs(process.env.SOLCLOUD_POLL_MS);
-const nodeLog = logFile(here, ownerText);
+const nodeLog = logFile(dataRoot, ownerText);
 let stopping = false;
 
 function log(taskId, action, detail) {
@@ -110,7 +117,7 @@ function errorText(err) {
 }
 
 function statePath(taskId) {
-  return stateFile(here, ownerText, taskId);
+  return stateFile(dataRoot, ownerText, taskId);
 }
 
 function readState(taskId) {
@@ -152,7 +159,7 @@ function shutdown() {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
-const idl = JSON.parse(readFileSync(idlPath, "utf8"));
+const idl = builtInIdl || JSON.parse(readFileSync(idlPath, "utf8"));
 const connection = new Connection(rpc, "confirmed");
 const provider = new AnchorProvider(connection, new Wallet(owner), { commitment: "confirmed" });
 const program = new Program(idl, provider);

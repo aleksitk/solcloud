@@ -9,6 +9,7 @@ import NetworkStats from "./NetworkStats.jsx";
 import NodeBrowser from "./NodeBrowser.jsx";
 import RoundHistory from "./RoundHistory.jsx";
 import RoundStatus from "./RoundStatus.jsx";
+import { QuickStart } from "./Setup.jsx";
 import StakeForm from "./StakeForm.jsx";
 import WalletButton from "./WalletButton.jsx";
 import { useWallet } from "./wallet.jsx";
@@ -220,10 +221,19 @@ function Operate() {
         <p className="lede">Stake once, start one program, and leave it running.</p>
       </header>
       {!wallet.address ? (
-        <Gate
-          title="Connect the node's wallet"
-          copy="The wallet that stakes owns the node. Connect it to stake, or to see the node it already runs."
-        />
+        <div className="work">
+          <div className="card">
+            <div className="card-head">
+              <h3>Start a node</h3>
+              <span>about 2 minutes</span>
+            </div>
+            <QuickStart />
+          </div>
+          <Gate
+            title="Already run one?"
+            copy="Connect the wallet that staked to see its node, its rounds, and to withdraw."
+          />
+        </div>
       ) : (
         <StakeForm />
       )}

@@ -13,7 +13,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 export function moduleFile(hash) {
   const name = String(hash).toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(name)) throw new Error("Wasm hash must be 64 hex characters.");
-  return join(here, "modules", `${name}.wasm`);
+  return join(process.env.SOLCLOUD_DATA || here, "modules", `${name}.wasm`);
 }
 
 const IO_CAP = 64;
@@ -30,9 +30,11 @@ export function runWasm({ file, hash, input, timeoutMs = DEFAULT_TIMEOUT_MS, del
   }
 
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL("./thread.mjs", import.meta.url), {
-      workerData: { wasm, input, delayMs },
-    });
+    // The packaged node has no thread.mjs on disk, so it carries that file's code as text.
+    const packed = globalThis.SOLCLOUD_THREAD;
+    const worker = packed
+      ? new Worker(packed, { eval: true, workerData: { wasm, input, delayMs } })
+      : new Worker(new URL("./thread.mjs", import.meta.url), { workerData: { wasm, input, delayMs } });
     let settled = false;
     const timer = setTimeout(() => {
       finish(() => reject(new Error("The wasm run timed out.")));
@@ -79,6 +81,11 @@ if (process.argv[1] && process.argv[1].endsWith("run.mjs")) {
     console.error("usage: node run.mjs <sha256-hex> <input-hex>");
     process.exit(1);
   }
-  const output = await runWasm({ file, hash, input: hexToBytes(inputHex) });
-  console.log(Buffer.from(output).toString("hex"));
+  runWasm({ file, hash, input: hexToBytes(inputHex) }).then(
+    (output) => console.log(Buffer.from(output).toString("hex")),
+    (err) => {
+      console.error(err.message);
+      process.exit(1);
+    }
+  );
 }
