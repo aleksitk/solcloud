@@ -13,6 +13,17 @@ if [ "$#" -eq 0 ]; then
   set -- "$HOME"/.config/solana/solcloud-node*.json
 fi
 
+# A private RPC endpoint, one line in ~/.solcloud-rpc, is used when that file exists.
+# The public devnet RPC limits requests per IP and refuses them when the network is busy.
+if [ -z "$SOLCLOUD_RPC" ] && [ -s "$HOME/.solcloud-rpc" ]; then
+  export SOLCLOUD_RPC="$(tr -d '[:space:]' < "$HOME/.solcloud-rpc")"
+  echo "using the RPC from ~/.solcloud-rpc"
+fi
+
+# Three listeners on one machine share one IP, and the public RPC limits requests per IP.
+# A slower poll keeps them under it. Set SOLCLOUD_RPC to a private endpoint to poll faster.
+export SOLCLOUD_POLL_MS="${SOLCLOUD_POLL_MS:-8000}"
+
 keep() {
   while true; do
     node --no-warnings listener.mjs "$1"
@@ -30,6 +41,6 @@ for key in "$@"; do
     continue
   fi
   keep "$key" &
-  sleep 2
+  sleep 3
 done
 wait

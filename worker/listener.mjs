@@ -160,7 +160,8 @@ process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 const idl = builtInIdl || JSON.parse(readFileSync(idlPath, "utf8"));
-const connection = new Connection(rpc, "confirmed");
+// The poll loop waits longer after a failure, so web3.js must not also retry a 429 on its own.
+const connection = new Connection(rpc, { commitment: "confirmed", disableRetryOnRateLimit: true });
 const provider = new AnchorProvider(connection, new Wallet(owner), { commitment: "confirmed" });
 const program = new Program(idl, provider);
 
@@ -255,10 +256,17 @@ async function ensureModule(hash, requester) {
   return { file, downloaded: true };
 }
 
+// A task this node could not run (no module, or the module refused the input)
+// is tried again only after a pause. Trying on every poll spent the RPC budget
+// on tasks that would never succeed.
+const PREPARE_RETRY_SECS = 300;
+const prepareRetryAt = new Map();
+
 // Run the task once and keep the output and nonce. A later commit attempt
 // reuses the same pair, so the hash on chain always matches the saved file.
 async function prepare(task, taskId) {
   if (existsSync(statePath(taskId))) return readState(taskId);
+  if (nowSecs() < (prepareRetryAt.get(taskId) || 0)) return null;
   const wasmHash = Buffer.from(task.account.wasmHash).toString("hex");
   const input = Uint8Array.from(Buffer.from(task.account.input));
   let file = "";
@@ -272,12 +280,17 @@ async function prepare(task, taskId) {
     return { output, nonce };
   } catch (err) {
     if (downloaded && file && existsSync(file)) unlinkSync(file);
+    prepareRetryAt.set(taskId, nowSecs() + PREPARE_RETRY_SECS);
     logOnce(taskId, "wasm", errorText(err));
     return null;
   }
 }
 
 async function commitTask(task, taskId) {
+  // A closed window needs no look at the chain. Old open tasks would otherwise
+  // cost a request on every poll, and the public RPC limits requests.
+  if (nowSecs() > task.account.commitDeadline.toNumber()) return;
+  if (!existsSync(statePath(taskId)) && nowSecs() < (prepareRetryAt.get(taskId) || 0)) return;
   const onChain = await readCommit(task.publicKey);
   if (onChain) {
     if (!existsSync(statePath(taskId))) {
@@ -285,7 +298,6 @@ async function commitTask(task, taskId) {
     }
     return;
   }
-  if (nowSecs() > task.account.commitDeadline.toNumber()) return;
 
   const saved = await prepare(task, taskId);
   if (!saved) return;

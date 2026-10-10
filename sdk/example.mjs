@@ -17,3 +17,6 @@ const round = await cloud.run({ wasm, input, reward: 0.05, committee: 3 });
 console.log(`task ${round.taskId}: ${round.status}, ${round.agreed} of ${round.committeeSize} agreed`);
 // A refunded round has no output: the reward went back to this keypair.
 if (round.status === "finalized") console.log(`output ${round.outputHex}`);
+
+// The RPC websocket would keep this script alive after the work is done.
+process.exit(0);

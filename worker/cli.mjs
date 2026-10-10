@@ -274,4 +274,8 @@ async function nodes() {
 const [command, ...rest] = process.argv.slice(2);
 const run = { request, publish, stake, exit, withdraw, status, nodes }[command];
 if (!run) usage();
-run(rest).catch((err) => fail(err?.message?.split("\n")[0] || String(err)));
+// Exit explicitly: the RPC websocket would otherwise keep the process alive.
+run(rest).then(
+  () => process.exit(0),
+  (err) => fail(err?.message?.split("\n")[0] || String(err))
+);

@@ -25,7 +25,9 @@ function hexBytes(bytes) {
   return hex;
 }
 
-const connection = new Connection(RPC, "confirmed");
+// web3.js retries a 429 four times by itself. withRetries below already waits and
+// retries, and the two together multiplied every refused request. Keep one.
+const connection = new Connection(RPC, { commitment: "confirmed", disableRetryOnRateLimit: true });
 
 function concat(parts) {
   return Buffer.concat(parts.map((part) => Buffer.from(part)));
@@ -112,7 +114,7 @@ async function withRetries(action) {
     } catch (err) {
       lastError = err;
       if (attempt === 4) break;
-      await wait(rateLimited(err) ? 2000 * attempt : 600);
+      await wait(rateLimited(err) ? 4000 * attempt : 600);
     }
   }
   throw lastError;

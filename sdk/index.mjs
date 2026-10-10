@@ -82,9 +82,9 @@ export class SolCloud {
   /**
    * @param {object} [options]
    * @param {string | Uint8Array | number[] | Keypair} [options.keypair] Pays and signs. Leave out to only read.
-   * @param {string} [options.rpc] Defaults to the public devnet RPC.
+   * @param {string} [options.rpc] Defaults to SOLCLOUD_RPC, then the public devnet RPC.
    */
-  constructor({ keypair, rpc = DEVNET_RPC } = {}) {
+  constructor({ keypair, rpc = process.env.SOLCLOUD_RPC || DEVNET_RPC } = {}) {
     this.keypair = keypair ? loadKeypair(keypair) : null;
     this.connection = new Connection(rpc, "confirmed");
     const wallet = new Wallet(this.keypair || Keypair.generate());
