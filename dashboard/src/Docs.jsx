@@ -263,10 +263,6 @@ node cli.mjs status 14`}</pre>
               </li>
               <li>Slashed SOL goes to a treasury that one key controls on devnet.</li>
               <li>A program is capped at 10,000 bytes of Wasm. It is stored in one Solana account.</li>
-              <li>
-                Compile works when this site is served from a developer machine. On the public site, build the
-                .wasm yourself and use Upload .wasm.
-              </li>
             </ul>
           </section>
         </div>

@@ -1,14 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { compileInBrowser } from "./compileInBrowser.js";
 import { useFunctionChoice } from "./functionChoice.jsx";
 import { buildModuleUpload, MAX_MODULE_BYTES, readModule, sendSigned } from "./requestTask.js";
 import { useWallet } from "./wallet.jsx";
-
-function bytesFromBase64(value) {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes;
-}
 
 async function sha256Hex(bytes) {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -42,20 +36,8 @@ export default function CodeEditor() {
     setBusy("compile");
     setError("");
     try {
-      const response = await fetch("/api/compile", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ source }),
-      });
-      // The published site is static. Only the local dev server has /api/compile.
-      // A static host answers an unknown path with 404, or with the page itself.
-      const isJson = (response.headers.get("content-type") || "").includes("application/json");
-      if (response.status === 404 || !isJson) {
-        throw new Error("This site cannot compile. Build the .wasm with asc and use Upload .wasm.");
-      }
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Compile failed.");
-      setCompiled({ name: "Your code", hash: body.hash, bytes: bytesFromBase64(body.wasmBase64) });
+      const { hash, bytes } = await compileInBrowser(source);
+      setCompiled({ name: "Your code", hash, bytes });
     } catch (err) {
       setError(err.message || "Compile failed.");
     } finally {
