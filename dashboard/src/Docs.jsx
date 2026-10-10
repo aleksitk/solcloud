@@ -6,6 +6,7 @@ const SECTIONS = [
   ["node", "Run a node"],
   ["code", "Write the code"],
   ["round", "How a round settles"],
+  ["money", "Rewards and stake"],
   ["limits", "Limits"],
 ];
 
@@ -39,8 +40,9 @@ export default function Docs({ go }) {
               on. A Solana program holds the reward, picks the machines, and pays them.
             </p>
             <p>
-              No single machine is trusted. Each one locks in its answer before it can see anyone else's, so copying
-              is not possible. A machine that answers differently from the majority loses part of its stake.
+              No single machine is trusted. Each one locks in its answer before it can see anyone else's, so it
+              cannot copy. Every machine has SOL at stake, and one that answers differently from the majority loses
+              half of it.
             </p>
             <div className="roles">
               <div>
@@ -49,7 +51,7 @@ export default function Docs({ go }) {
               </div>
               <div>
                 <b>Node operator</b>
-                <span>Has a machine. Stakes SOL, runs the node program, and earns rewards.</span>
+                <span>Has a machine. Puts up SOL as a guarantee, runs the node program, and earns rewards.</span>
               </div>
             </div>
           </section>
@@ -70,6 +72,30 @@ export default function Docs({ go }) {
               <li>Give the input, choose how many nodes run it, and set the reward.</li>
               <li>Press Review, then sign. The round settles on its own, usually in under a minute.</li>
             </ol>
+            <h3>From your backend</h3>
+            <p>
+              You do not need this site, an account, or an API key. Any code that holds a Solana keypair with some
+              SOL can send a task. The SDK does it in one call.
+            </p>
+            <pre className="code">npm install github:aleksitk/solcloud</pre>
+            <pre className="code">{`import { SolCloud } from "solcloud";
+
+const cloud = new SolCloud({ keypair: "./backend-key.json" });
+
+const round = await cloud.run({
+  wasm: "./my-function.wasm",
+  input: "05000000",
+  reward: 0.05,
+  committee: 3,
+});
+
+if (round.status === "finalized") console.log(round.outputHex);`}</pre>
+            <p>
+              <code>run</code> stores the Wasm on chain the first time, creates the task, and waits for the round
+              to settle. A round ends <code>finalized</code> with an output, or <code>refunded</code> with the
+              reward back in the keypair. Use <code>request</code> and <code>wait</code> separately if you do not
+              want to hold the call open.
+            </p>
             <h3>From a terminal</h3>
             <p>
               The same request without the site. It needs Node.js 22 and a funded Devnet keypair file.
@@ -182,13 +208,46 @@ node cli.mjs status 14`}</pre>
               </li>
             </ol>
             <p>
-              Each step has five minutes. If a node never commits, the reward goes back to the requester and nobody
-              is slashed: no answer was hidden.
+              Commits are due within five minutes of the request, and reveals five minutes after that. If a node
+              never commits, the reward goes back to the requester and nobody is slashed: no answer was hidden.
             </p>
             <p>
               If a node commits and then never reveals, it is slashed like a wrong answer. Otherwise a node could
               hide a mistake by staying silent. The round still settles on the answers that did arrive, as long as
               they are a majority of the whole committee.
+            </p>
+          </section>
+
+          <section className="doc" id="money">
+            <h2>Rewards and stake</h2>
+            <p>
+              The stake is the node operator's guarantee. It is the operator's own SOL, locked in the node's account,
+              and the program can take half of it when the node is wrong. That is what makes an honest answer the
+              cheaper choice.
+            </p>
+            <ul>
+              <li>
+                <b>The requester pays the reward.</b> It is locked when the task is created and split equally
+                among the nodes in the majority.
+              </li>
+              <li>
+                <b>No majority, no charge.</b> If the answers do not reach a majority, the whole reward goes back
+                to the requester.
+              </li>
+              <li>
+                <b>A wrong answer costs half the stake.</b> So does committing and never revealing. The slashed
+                SOL goes to the protocol treasury.
+              </li>
+              <li>
+                <b>The stake comes back.</b> A node that leaves gets back whatever stake it has left, after an
+                11 minute delay.
+              </li>
+            </ul>
+            <h3>An example</h3>
+            <p>
+              A task offers 0.06 SOL to three nodes, each with 1 SOL staked. If all three agree, each earns 0.02
+              SOL. If one differs, the other two earn 0.03 SOL each and the third loses 0.5 SOL. Being wrong once
+              costs more than twenty correct answers pay.
             </p>
           </section>
 
@@ -198,6 +257,11 @@ node cli.mjs status 14`}</pre>
               <li>This runs on Solana Devnet. The SOL has no value.</li>
               <li>Security is an honest majority plus stake. It is not a cryptographic proof.</li>
               <li>One person can stake several nodes. Larger committees make that harder to exploit.</li>
+              <li>
+                The guarantee holds while the reward is small next to the stake. Nothing stops a task from offering
+                more than the committee has at risk.
+              </li>
+              <li>Slashed SOL goes to a treasury that one key controls on devnet.</li>
               <li>A program is capped at 10,000 bytes of Wasm. It is stored in one Solana account.</li>
               <li>
                 Compile works when this site is served from a developer machine. On the public site, build the

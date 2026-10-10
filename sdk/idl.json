@@ -1,0 +1,1764 @@
+{
+  "address": "D59BiW9kNVq4dnYfk8JcxHqQGwaXqHuaXCoaaFPK9GoZ",
+  "metadata": {
+    "name": "solcloud",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "SolCloud — verifiable off-chain compute for Solana"
+  },
+  "instructions": [
+    {
+      "name": "close_module",
+      "docs": [
+        "Give up on an upload that never completed and take the rent back.",
+        "A sealed module stays: tasks may already name it."
+      ],
+      "discriminator": [
+        199,
+        185,
+        56,
+        7,
+        3,
+        32,
+        206,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "module",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "uploader"
+              },
+              {
+                "kind": "account",
+                "path": "module.wasm_hash",
+                "account": "ModuleAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "uploader",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "module"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "commit_result",
+      "docs": [
+        "A committee node submits `sha256(output ‖ nonce_le)` without revealing yet."
+      ],
+      "discriminator": [
+        45,
+        73,
+        224,
+        222,
+        48,
+        67,
+        191,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "commit",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "node"
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_task_id",
+          "type": "u64"
+        },
+        {
+          "name": "hash_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_module",
+      "docs": [
+        "Reserve an account for a Wasm module. The bytes follow in `write_module`."
+      ],
+      "discriminator": [
+        74,
+        150,
+        3,
+        191,
+        94,
+        127,
+        118,
+        158
+      ],
+      "accounts": [
+        {
+          "name": "module",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "uploader"
+              },
+              {
+                "kind": "arg",
+                "path": "wasm_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "uploader",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "wasm_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "size",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "extend_registry",
+      "docs": [
+        "Grow the live config account so `active_nodes` can be read.",
+        "",
+        "The devnet config was created before that field. Call this once after the",
+        "upgrade, before register, index, request, or finalize. New bytes are zero,",
+        "which is an empty list."
+      ],
+      "discriminator": [
+        180,
+        169,
+        56,
+        232,
+        182,
+        173,
+        113,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize",
+      "docs": [
+        "Tally reveals. Majority (`floor(N/2)+1`) wins and is paid. Otherwise refund.",
+        "",
+        "Runs once every node has revealed, or once the reveal window has closed.",
+        "After the window a node that committed and stayed silent is slashed, so",
+        "hiding a wrong answer costs the same as revealing it. The majority is",
+        "still counted against the full committee size.",
+        "",
+        "Remaining accounts are triples, one per committee node:",
+        "`[commit_0, wallet_0, node_0, ...]`.",
+        "`wallet` is the node owner and must match `commit.node`.",
+        "`node` is that owner's node PDA. A minority reveal loses `slash_bps` of its stake."
+      ],
+      "discriminator": [
+        171,
+        61,
+        218,
+        56,
+        127,
+        115,
+        12,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "result",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task"
+              }
+            ]
+          }
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "requester",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_task_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "index_node",
+      "docs": [
+        "Put an already-registered active node onto `config.active_nodes`.",
+        "",
+        "`register_node` does this for new nodes. The three nodes already on devnet",
+        "need this once, signed by the config authority."
+      ],
+      "discriminator": [
+        148,
+        76,
+        231,
+        90,
+        199,
+        212,
+        234,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "node"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "One-time protocol setup: creates the global Config PDA."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "treasury"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "min_stake",
+          "type": "u64"
+        },
+        {
+          "name": "reward_default",
+          "type": "u64"
+        },
+        {
+          "name": "slash_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "refund_expired",
+      "docs": [
+        "Return the escrowed reward when the commit window closed before every node committed.",
+        "",
+        "Nobody is slashed here: no answer was hidden, a node was only absent.",
+        "Once a task is revealing it must go through `finalize`, which also",
+        "handles a closed reveal window and slashes the nodes that stayed silent."
+      ],
+      "discriminator": [
+        118,
+        153,
+        164,
+        244,
+        40,
+        128,
+        242,
+        250
+      ],
+      "accounts": [
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "result",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_task_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "register_node",
+      "docs": [
+        "A node joins the registry by staking. Stake lamports sit on the node PDA."
+      ],
+      "discriminator": [
+        102,
+        85,
+        117,
+        114,
+        194,
+        188,
+        211,
+        168
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "node",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111,
+                  100,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "stake_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "request_exit",
+      "docs": [
+        "A node asks to leave. It drops out of the registry at once, so no new round",
+        "can draw it, and its stake stays slashable until the exit delay has passed."
+      ],
+      "discriminator": [
+        121,
+        186,
+        203,
+        74,
+        138,
+        218,
+        135,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "node",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111,
+                  100,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ticket",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "request_task",
+      "docs": [
+        "A dApp requests an off-chain computation and escrows the reward.",
+        "",
+        "The requester chooses N (odd, 3..=11) and a slot it just observed.",
+        "The program draws N owners from `config.active_nodes` with",
+        "`sha256(slot ‖ task_id)` and rejects any other remaining-accounts list.",
+        "The landing slot itself is not the seed: a wallet signature cannot be",
+        "built and landed inside one 400ms slot."
+      ],
+      "discriminator": [
+        225,
+        173,
+        85,
+        49,
+        63,
+        44,
+        143,
+        116
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": "u64"
+        },
+        {
+          "name": "wasm_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "input",
+          "type": "bytes"
+        },
+        {
+          "name": "reward",
+          "type": "u64"
+        },
+        {
+          "name": "committee_size",
+          "type": "u8"
+        },
+        {
+          "name": "seed_slot",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "reveal_result",
+      "docs": [
+        "A committee node reveals its output and nonce after every node has committed."
+      ],
+      "discriminator": [
+        251,
+        165,
+        27,
+        86,
+        52,
+        234,
+        133,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "commit",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_task_id",
+          "type": "u64"
+        },
+        {
+          "name": "output",
+          "type": "bytes"
+        },
+        {
+          "name": "nonce",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_stake",
+      "docs": [
+        "After the exit delay, close the node account and return what is left of the stake."
+      ],
+      "discriminator": [
+        153,
+        8,
+        22,
+        138,
+        105,
+        176,
+        87,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "node",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111,
+                  100,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ticket",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "ticket"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "write_module",
+      "docs": [
+        "Append the next bytes. The last chunk must make the whole module hash to",
+        "`wasm_hash`, or the transaction fails and the module stays open."
+      ],
+      "discriminator": [
+        26,
+        154,
+        234,
+        74,
+        117,
+        172,
+        35,
+        178
+      ],
+      "accounts": [
+        {
+          "name": "module",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "uploader"
+              },
+              {
+                "kind": "account",
+                "path": "module.wasm_hash",
+                "account": "ModuleAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "uploader",
+          "signer": true,
+          "relations": [
+            "module"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "chunk",
+          "type": "bytes"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "CommitAccount",
+      "discriminator": [
+        249,
+        25,
+        21,
+        196,
+        87,
+        200,
+        118,
+        188
+      ]
+    },
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "ExitTicket",
+      "discriminator": [
+        137,
+        38,
+        96,
+        201,
+        22,
+        40,
+        172,
+        171
+      ]
+    },
+    {
+      "name": "ModuleAccount",
+      "discriminator": [
+        133,
+        79,
+        41,
+        127,
+        120,
+        138,
+        143,
+        83
+      ]
+    },
+    {
+      "name": "NodeAccount",
+      "discriminator": [
+        125,
+        166,
+        18,
+        146,
+        195,
+        127,
+        86,
+        220
+      ]
+    },
+    {
+      "name": "TaskAccount",
+      "discriminator": [
+        235,
+        32,
+        10,
+        23,
+        81,
+        60,
+        170,
+        203
+      ]
+    },
+    {
+      "name": "TaskResult",
+      "discriminator": [
+        95,
+        49,
+        10,
+        219,
+        220,
+        60,
+        223,
+        29
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "StakeTooLow",
+      "msg": "Stake amount is below the configured minimum."
+    },
+    {
+      "code": 6001,
+      "name": "InvalidCommitteeSize",
+      "msg": "Committee size must be between MIN_COMMITTEE_SIZE and MAX_COMMITTEE_SIZE."
+    },
+    {
+      "code": 6002,
+      "name": "CommitteeSizeNotOdd",
+      "msg": "Committee size must be an odd number (3, 5, 7, 9, 11)."
+    },
+    {
+      "code": 6003,
+      "name": "InputTooLarge",
+      "msg": "Input exceeds the maximum allowed size."
+    },
+    {
+      "code": 6004,
+      "name": "OutputTooLarge",
+      "msg": "Output exceeds the maximum allowed size."
+    },
+    {
+      "code": 6005,
+      "name": "NotEnoughNodes",
+      "msg": "Not enough registered nodes for the requested committee size."
+    },
+    {
+      "code": 6006,
+      "name": "NotInCommittee",
+      "msg": "Node is not a member of this task's committee."
+    },
+    {
+      "code": 6007,
+      "name": "CommitWindowClosed",
+      "msg": "The commit window for this task has closed."
+    },
+    {
+      "code": 6008,
+      "name": "RevealWindowClosed",
+      "msg": "The reveal window for this task has closed."
+    },
+    {
+      "code": 6009,
+      "name": "WindowStillOpen",
+      "msg": "The commit or reveal window is still open, or the task can still be finalized."
+    },
+    {
+      "code": 6010,
+      "name": "CommitmentMismatch",
+      "msg": "Reveal does not match the previously submitted commitment."
+    },
+    {
+      "code": 6011,
+      "name": "AlreadyActed",
+      "msg": "This node has already acted for this task."
+    },
+    {
+      "code": 6012,
+      "name": "InvalidTaskState",
+      "msg": "Task is not in the expected state for this instruction."
+    },
+    {
+      "code": 6013,
+      "name": "NoConsensus",
+      "msg": "No majority consensus was reached."
+    },
+    {
+      "code": 6014,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow."
+    },
+    {
+      "code": 6015,
+      "name": "NodeNotActive",
+      "msg": "Node is not active."
+    },
+    {
+      "code": 6016,
+      "name": "DuplicateCommitteeNode",
+      "msg": "Duplicate node in committee."
+    },
+    {
+      "code": 6017,
+      "name": "InvalidCommitteeNode",
+      "msg": "Committee account is not a registered node."
+    },
+    {
+      "code": 6018,
+      "name": "BadFinalizeAccounts",
+      "msg": "Finalize accounts do not match the committee."
+    },
+    {
+      "code": 6019,
+      "name": "RegistryFull",
+      "msg": "The node registry is full."
+    },
+    {
+      "code": 6020,
+      "name": "BadAuthority",
+      "msg": "Only the config authority can do this."
+    },
+    {
+      "code": 6021,
+      "name": "CommitteeMismatch",
+      "msg": "The remaining accounts are not the committee drawn for this slot."
+    },
+    {
+      "code": 6022,
+      "name": "SeedSlotInFuture",
+      "msg": "That seed slot is still in the future."
+    },
+    {
+      "code": 6023,
+      "name": "SeedSlotExpired",
+      "msg": "That seed slot is too old. Review the request again."
+    },
+    {
+      "code": 6024,
+      "name": "BadModuleSize",
+      "msg": "A module must be between 1 and 10000 bytes."
+    },
+    {
+      "code": 6025,
+      "name": "ModuleSealed",
+      "msg": "This module is already complete."
+    },
+    {
+      "code": 6026,
+      "name": "ModuleOverflow",
+      "msg": "That chunk runs past the module's size."
+    },
+    {
+      "code": 6027,
+      "name": "ModuleHashMismatch",
+      "msg": "The uploaded bytes do not hash to the module's SHA-256."
+    },
+    {
+      "code": 6028,
+      "name": "ExitNotReady",
+      "msg": "The exit delay has not passed yet."
+    }
+  ],
+  "types": [
+    {
+      "name": "CommitAccount",
+      "docs": [
+        "One node's commit+reveal record for a task",
+        "(PDA, seed = \"commit\" ++ task ++ node)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "node",
+            "type": "pubkey"
+          },
+          {
+            "name": "hash_commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "output_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "output",
+            "type": "bytes"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "revealed",
+            "type": "bool"
+          },
+          {
+            "name": "submitted_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "revealed_at",
+            "docs": [
+              "Unix time of the reveal. Zero until then.",
+              "Appended so an older commit account still deserializes: its spare tail reads as zero."
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "docs": [
+        "Global protocol configuration (single PDA, seed = \"config\")."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "min_stake",
+            "type": "u64"
+          },
+          {
+            "name": "reward_default",
+            "type": "u64"
+          },
+          {
+            "name": "node_count",
+            "type": "u64"
+          },
+          {
+            "name": "task_count",
+            "type": "u64"
+          },
+          {
+            "name": "slash_bps",
+            "docs": [
+              "Slash fraction in basis points (e.g. 5000 = 50%)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "active_nodes",
+            "docs": [
+              "Owners of nodes that joined after this field existed, plus any indexed earlier nodes.",
+              "Appended at the end so an older config account can be extended with zeros."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExitTicket",
+      "docs": [
+        "A node's request to leave (PDA, seed = \"exit\" ++ owner).",
+        "Kept apart from NodeAccount so older node accounts need no new field."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "ready_at",
+            "docs": [
+              "Unix time from which the stake can be withdrawn."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ModuleAccount",
+      "docs": [
+        "A Wasm module stored on chain so any node can fetch it",
+        "(PDA, seed = \"module\" ++ uploader ++ wasm_hash)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "uploader",
+            "type": "pubkey"
+          },
+          {
+            "name": "wasm_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "size",
+            "docs": [
+              "Full length of the module in bytes."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "sealed",
+            "docs": [
+              "True once every byte is in and sha256(data) equals wasm_hash."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NodeAccount",
+      "docs": [
+        "A staked worker node (PDA, seed = \"node\" ++ owner)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake_amount",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "NodeStatus"
+              }
+            }
+          },
+          {
+            "name": "reputation",
+            "type": "i64"
+          },
+          {
+            "name": "tasks_completed",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "tasks_slashed",
+            "docs": [
+              "Rounds this node lost after a majority existed.",
+              "Appended so an older 66-byte node account can be extended with zeros."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NodeStatus",
+      "docs": [
+        "Lifecycle of a node in the registry."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Inactive"
+          },
+          {
+            "name": "Slashed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResultStatus",
+      "docs": [
+        "Final status recorded on a TaskResult."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Finalized"
+          },
+          {
+            "name": "Failed"
+          },
+          {
+            "name": "Refunded"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskAccount",
+      "docs": [
+        "A compute task (PDA, seed = \"task\" ++ task_id)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "wasm_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "input",
+            "type": "bytes"
+          },
+          {
+            "name": "reward",
+            "type": "u64"
+          },
+          {
+            "name": "committee_size",
+            "docs": [
+              "Chosen committee size N (odd, 3..=11)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "committee",
+            "docs": [
+              "Selected committee node owners (len == committee_size)."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "TaskStatus"
+              }
+            }
+          },
+          {
+            "name": "commit_count",
+            "type": "u8"
+          },
+          {
+            "name": "reveal_count",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "commit_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "reveal_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "task_id",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskResult",
+      "docs": [
+        "The finalized, verified result of a task (PDA, seed = \"result\" ++ task)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "final_output",
+            "type": "bytes"
+          },
+          {
+            "name": "output_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "ResultStatus"
+              }
+            }
+          },
+          {
+            "name": "agreed_count",
+            "type": "u8"
+          },
+          {
+            "name": "committee_size",
+            "type": "u8"
+          },
+          {
+            "name": "finalized_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskStatus",
+      "docs": [
+        "Lifecycle of a task."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Requested"
+          },
+          {
+            "name": "Committing"
+          },
+          {
+            "name": "Revealing"
+          },
+          {
+            "name": "Finalized"
+          },
+          {
+            "name": "Failed"
+          },
+          {
+            "name": "Refunded"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -109,6 +109,24 @@ On first run it makes a key in `~/.solcloud/`, prints the address, waits for 1.0
 
 The site links to `releases/latest/download/solcloud-node.exe`, so each build is published as a GitHub release.
 
+## From your own code
+
+The site is one client of the program. A backend sends a task with the SDK in `sdk/`, with no account and no API key: a keypair with some SOL signs and pays.
+
+```bash
+npm install github:aleksitk/solcloud
+```
+
+```js
+import { SolCloud } from "solcloud";
+
+const cloud = new SolCloud({ keypair: "./backend-key.json" });
+const round = await cloud.run({ wasm: "./my-function.wasm", input: "05000000", reward: 0.05, committee: 3 });
+if (round.status === "finalized") console.log(round.outputHex);
+```
+
+`sdk/README.md` lists every call. After `anchor build`, copy `program/target/idl/solcloud.json` to `sdk/idl.json` as well as `worker/idl/`.
+
 ## From a terminal
 
 `worker/cli.mjs` does what the site does, with a keypair file in place of a wallet:

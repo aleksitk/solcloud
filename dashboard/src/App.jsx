@@ -127,7 +127,7 @@ function Home({ go }) {
         <article className="path-card dark">
           <p className="kicker">I have a machine</p>
           <h3>Run a node.</h3>
-          <p>Stake once and leave one program running. It earns a share of every task it gets right.</p>
+          <p>Put up a stake and leave one program running. It earns a share of every task it gets right.</p>
           <button type="button" className="btn" onClick={() => go("operate")}>
             Run a node <span className="arrow">→</span>
           </button>

@@ -408,6 +408,7 @@ export default function LaunchForm({ onOpenRequests }) {
               }}
             />
           </label>
+          <p className="hint">Split equally among the nodes that agree. Returned in full if there is no majority.</p>
         </div>
 
         <button className="btn" type="submit" disabled={!valid || phase === "reading" || busy}>

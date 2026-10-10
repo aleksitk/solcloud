@@ -1,0 +1,24 @@
+{
+  "name": "solcloud",
+  "version": "0.1.0",
+  "description": "Send a task to SolCloud from your own code and read the answer a committee agreed on.",
+  "repository": "github:aleksitk/solcloud",
+  "exports": {
+    ".": {
+      "types": "./sdk/index.d.ts",
+      "default": "./sdk/index.mjs"
+    }
+  },
+  "files": [
+    "sdk"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@solana/web3.js": "1.98.4",
+    "rpc-websockets": "9.3.8"
+  },
+  "types": "./sdk/index.d.ts"
+}

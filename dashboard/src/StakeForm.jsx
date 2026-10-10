@@ -264,7 +264,8 @@ export default function StakeForm() {
             />
           </label>
           <p className="hint">
-            Minimum is {solLabel(minStake)} SOL. The stake stays in the node account. A wrong answer loses part of it.
+            Minimum is {solLabel(minStake)} SOL. This is your guarantee: a wrong answer, or a commit you never
+            reveal, costs half of it. You get the rest back when you leave.
           </p>
           <div className="row-actions" style={{ marginTop: 18 }}>
             <button className="btn" type="submit" disabled={!valid || busy}>
